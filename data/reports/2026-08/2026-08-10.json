@@ -1,0 +1,52 @@
+[
+  {
+    "id": "REP_1786356831900_911",
+    "timestamp": "2026-08-10T10:13:51.899Z",
+    "date": "2026-08-10",
+    "user_info": {
+      "id": 5732312905,
+      "first_name": "Phạm Thanh"
+    },
+    "input_type": "text",
+    "parsed_result": {
+      "status": "success",
+      "has_warning": false,
+      "warning_message": "",
+      "report_date": null,
+      "staff_data": [],
+      "expenses_data": [
+        {
+          "category": "Chi phí vận hành",
+          "amount": 15000000,
+          "notes": "Lập bàn thần tài"
+        }
+      ],
+      "installments_data": []
+    }
+  },
+  {
+    "id": "REP_1786355387946_54",
+    "timestamp": "2026-08-10T09:49:47.946Z",
+    "date": "2026-08-10",
+    "user_info": {
+      "id": 5732312905,
+      "first_name": "Phạm Thanh"
+    },
+    "input_type": "text",
+    "parsed_result": {
+      "status": "success",
+      "has_warning": false,
+      "warning_message": "",
+      "staff_data": [],
+      "expenses_data": [],
+      "installments_data": [
+        {
+          "item_name": "Điều hoà",
+          "total_amount": 10300000,
+          "months": 6,
+          "monthly_amount": 1716667
+        }
+      ]
+    }
+  }
+]
