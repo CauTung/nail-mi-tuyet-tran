@@ -72,6 +72,8 @@ Bot sẽ khởi chạy với thông báo: `🚀 Telegram Spa/Salon OCR Bot đã 
 | :--- | :--- |
 | **`/today`** | Xem tổng hợp báo cáo thu chi, lợi nhuận ròng và doanh số nhân viên **hôm nay**. |
 | **`/month`** hoặc **`/month YYYY-MM`** | Xem tổng hợp báo cáo **cả tháng** (tự động cộng dồn doanh thu & trừ tiền trả góp). |
+| **`/luong`** hoặc **`/luong YYYY-MM`** | Xem bảng tổng hợp số công và tổng doanh số mang về của từng thợ trong tháng. |
+| **`/export`** hoặc **`/export YYYY-MM`** | **Xuất file Excel/CSV báo cáo tháng** tải trực tiếp trên Telegram. |
 | **`/search YYYY-MM-DD`** | Tra cứu tổng hợp thu chi của một **ngày cụ thể** bất kỳ. |
 | **`/tragop`** | Xem danh sách các hợp đồng mua trả góp máy móc/thiết bị dài hạn đang chạy. |
 | **`/myid`** | Xem Telegram User ID cá nhân và quyền hạn hiện tại của bạn. |

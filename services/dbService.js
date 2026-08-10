@@ -524,6 +524,57 @@ function getMonthlySummary(yearMonth) {
   };
 }
 
+/**
+ * Xuất dữ liệu báo cáo tháng ra file CSV (Excel)
+ */
+function exportMonthlyCsv(yearMonth) {
+  initDb();
+  const monthFolder = path.join(REPORTS_DIR, yearMonth);
+  if (!fs.existsSync(monthFolder)) return null;
+
+  const files = fs.readdirSync(monthFolder).filter(f => f.endsWith(".json")).sort();
+
+  let csvContent = "\uFEFF"; // UTF-8 BOM cho Excel mở tiếng Việt không lỗi font
+  csvContent += "Ngày,Mã Báo Cáo,Tên Nhân Viên,Công (Score),Gội/Móng (VNĐ),Mi/Phun Xăm (VNĐ),Tăng Ca (VNĐ),Tổng Doanh Thu NV (VNĐ),Khoản Chi Tiêu,Số Tiền Chi (VNĐ)\n";
+
+  files.forEach(file => {
+    const filePath = path.join(monthFolder, file);
+    try {
+      const reports = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      reports.forEach(r => {
+        const date = r.date;
+        const repId = r.id;
+        const parsed = r.parsed_result;
+
+        const staffData = parsed.staff_data || [];
+        const expensesData = parsed.expenses_data || [];
+        const maxRows = Math.max(staffData.length, expensesData.length, 1);
+
+        for (let i = 0; i < maxRows; i++) {
+          const s = staffData[i] || {};
+          const e = expensesData[i] || {};
+
+          const sName = s.name ? `"${s.name}"` : "";
+          const sScore = s.attendance_score !== undefined ? s.attendance_score : "";
+          const sGoiMong = s.revenue?.goi_mong || 0;
+          const sMi = s.revenue?.mi || 0;
+          const sNgoaiGio = s.revenue?.ngoai_gio || 0;
+          const sTotal = (sGoiMong + sMi + sNgoaiGio) || 0;
+
+          const eNotes = e.notes ? `"${e.notes.replace(/"/g, '""')}"` : "";
+          const eAmount = e.amount || 0;
+
+          csvContent += `${date},${repId},${sName},${sScore},${sGoiMong},${sMi},${sNgoaiGio},${sTotal},${eNotes},${eAmount}\n`;
+        }
+      });
+    } catch (err) {}
+  });
+
+  const exportPath = path.join(DATA_DIR, `BaoCao_NailMi_TuyetTran_${yearMonth}.csv`);
+  fs.writeFileSync(exportPath, csvContent, "utf-8");
+  return exportPath;
+}
+
 module.exports = {
   initDb,
   getStaffListDb,
@@ -544,5 +595,6 @@ module.exports = {
   getDailyReports,
   getDailySummary,
   getMonthlySummary,
+  exportMonthlyCsv,
   getDateKeys
 };

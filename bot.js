@@ -15,6 +15,7 @@ const {
   getDailyReports, 
   getDailySummary,
   getMonthlySummary, 
+  exportMonthlyCsv,
   getDateKeys,
   isAdminUser,
   addAdminUser,
@@ -374,6 +375,46 @@ bot.command(["month", "thang"], (ctx) => {
     `👩‍Working **Thống kê nhân viên:**\n${staffDetailText}`;
 
   ctx.reply(msg, { parse_mode: "Markdown" });
+});
+
+// XUẤT FILE EXCEL / CSV BÁO CÁO THÁNG (/export 2026-08 hoặc /xuatexcel)
+bot.command(["export", "xuatexcel"], (ctx) => {
+  const args = ctx.message.text.split(" ");
+  const { yearMonth: currentYM } = getDateKeys();
+  const targetYM = args[1] || currentYM;
+
+  const filePath = exportMonthlyCsv(targetYM);
+  if (!filePath) {
+    return ctx.reply(`📅 **Không có dữ liệu báo cáo nào cho tháng \`${targetYM}\` để xuất file.**`, { parse_mode: "Markdown" });
+  }
+
+  ctx.replyWithDocument({ source: filePath, filename: `BaoCao_NailMi_TuyetTran_${targetYM}.csv` }, {
+    caption: `📊 **File Báo Cáo Thu Chi & Doanh Số Tháng ${targetYM} (Định dạng Excel / CSV)**`
+  }).catch(err => {
+    ctx.reply(`❌ Không thể gửi file: ${err.message}`);
+  });
+});
+
+// BẢNG LƯƠNG & DOANH SỐ CÔNG NHÂN VIÊN THÁNG (/luong hoặc /payroll)
+bot.command(["luong", "payroll"], (ctx) => {
+  const args = ctx.message.text.split(" ");
+  const { yearMonth: currentYM } = getDateKeys();
+  const targetYM = args[1] || currentYM;
+
+  const summary = getMonthlySummary(targetYM);
+  if (!summary) {
+    return ctx.reply(`📅 **Chưa có dữ liệu cho tháng \`${targetYM}\`.**`);
+  }
+
+  let text = `👩‍Working **BẢNG TỔNG HỢP CÔNG & DOANH SỐ THỢ THÁNG ${targetYM}**\n----------------------------------------\n\n`;
+  Object.keys(summary.staffStats).forEach((name, idx) => {
+    const s = summary.staffStats[name];
+    text += `${idx + 1}. **${name}**:\n`;
+    text += `   • Số ngày/công làm: **${s.total_score} công**\n`;
+    text += `   • Tổng doanh số mang về: **${s.total_revenue.toLocaleString("vi-VN")} VNĐ**\n\n`;
+  });
+
+  ctx.reply(text, { parse_mode: "Markdown" });
 });
 
 bot.command("search", (ctx) => {
