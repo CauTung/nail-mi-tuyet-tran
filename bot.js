@@ -48,7 +48,7 @@ bot.start((ctx) => {
   const isAdmin = isAdminUser(userId);
 
   ctx.reply(
-    "👋 Chào mừng bạn đến với Telegram Bot OCR & Quản lý Báo cáo Spa/Salon!\n\n" +
+    "👋 Chào mừng bạn đến với Telegram Bot OCR & Quản lý Báo cáo Tiệm Nail Mi Tuyết Trần!\n\n" +
     "📸 Gửi **Ảnh chụp bảng viết tay**, **Ảnh chụp màn hình**, hoặc **Tin nhắn báo cáo**.\n" +
     `🆔 **Telegram ID của bạn**: \`${userId}\` ${isAdmin ? "(👑 Chủ tiệm / Admin)" : "(Nhiên viên)"}\n\n` +
     "Các lệnh tra cứu & quản lý:\n" +

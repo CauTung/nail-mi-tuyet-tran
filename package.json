@@ -1,7 +1,7 @@
 {
-  "name": "spa-salon-telegram-ocr-bot",
+  "name": "nail-mi-tuyet-tran-ocr-bot",
   "version": "1.0.0",
-  "description": "Telegram Bot AI OCR & Data Extraction for Spa/Salon Daily Reports",
+  "description": "Telegram Bot AI OCR & Data Extraction for Nail Mi Tuyet Tran Daily Reports",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",

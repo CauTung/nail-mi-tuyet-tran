@@ -3,7 +3,7 @@ const { getStaffList } = require("../config/staff");
 
 function getSystemPrompt(staffList) {
   const staffString = staffList.join(", ");
-  return `Bạn là một trợ lý AI xử lý dữ liệu (OCR chuyên sâu) cho một tiệm Spa/Salon tóc và móng.
+  return `Bạn là một trợ lý AI xử lý dữ liệu (OCR chuyên sâu) cho tiệm Nail Mi Tuyết Trần.
 Nhiệm vụ của bạn là phân tích hình ảnh (bảng viết tay, ảnh chụp màn hình) hoặc đoạn tin nhắn do chủ tiệm gửi lên. Bóc tách toàn bộ dữ liệu Doanh thu nhân viên, Ca làm việc, và các khoản Chi tiêu trong ngày rồi trả về định dạng JSON nghiêm ngặt.
 
 ### DANH SÁCH NHÂN VIÊN HỢP LỆ (Dữ liệu gốc để đối chiếu):

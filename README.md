@@ -1,6 +1,6 @@
-# 💅 Spa/Salon Daily OCR & Financial Telegram Bot 💇‍♀️
+# 💅 Nail Mi Tuyết Trần - Daily OCR & Financial Telegram Bot 💇‍♀️
 
-Hệ thống **Telegram Bot AI OCR & Quản lý Báo cáo Thu Chi Tự động** chuyên dụng cho tiệm Spa/Salon Tóc và Móng.
+Hệ thống **Telegram Bot AI OCR & Quản lý Báo cáo Thu Chi Tự động** chuyên dụng cho tiệm **Nail Mi Tuyết Trần**.
 
 Bot ứng dụng mô hình **Google Gemini 2.0 Flash Vision AI** giúp tự động đọc hiểu hình ảnh (bảng viết tay, ảnh chụp màn hình) hoặc tin nhắn báo cáo hàng ngày từ chủ tiệm/thợ, bóc tách chuẩn xác 100% doanh thu nhân viên, ca làm việc (công), chi tiêu và tự động lên lịch mua trả góp dài hạn.
 
