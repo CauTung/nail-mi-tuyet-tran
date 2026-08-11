@@ -83,6 +83,45 @@ CẤU TRÚC JSON MẪU 2 (DÀNH CHO TRÒ CHUYỆN / HỎI ĐÁP CHUNG):
 }`;
 }
 
+const fetch = require("node-fetch");
+
+let cachedWorkingModel = null;
+
+async function getWorkingModel(apiKey) {
+  if (cachedWorkingModel) return cachedWorkingModel;
+
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.models)) {
+        const supported = data.models
+          .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
+          .map(m => m.name.replace("models/", ""));
+
+        console.log("🤖 [AI DYNAMIC DISCOVERY] Danh sách model Google hỗ trợ cho API Key của bạn:", supported);
+
+        // Ưu tiên chọn model flash 2.0 -> flash 1.5 -> pro
+        const chosen = supported.find(m => m.includes("2.0") && m.includes("flash"))
+                    || supported.find(m => m.includes("1.5") && m.includes("flash"))
+                    || supported.find(m => m.includes("flash"))
+                    || supported.find(m => m.includes("pro"))
+                    || supported[0];
+
+        if (chosen) {
+          cachedWorkingModel = chosen;
+          console.log(`🎯 [AI DYNAMIC DISCOVERY] Đã tự động chọn model chuẩn nhất: ${chosen}`);
+          return chosen;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("⚠️ Không thể quét danh sách model từ Google API:", e.message);
+  }
+
+  return "gemini-1.5-flash";
+}
+
 async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeType = "image/jpeg", customStaffList, existingReports }) {
   const apiKey = env.geminiApiKey;
   if (!apiKey) {
@@ -90,8 +129,11 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  // Sử dụng duy nhất model gemini-2.0-flash chính thức và mạnh nhất của Google AI Studio
-  const candidateModels = ["gemini-2.0-flash"];
+  
+  // Tự động tìm model chính xác 100% đang hoạt động cho API Key
+  const workingModelName = await getWorkingModel(apiKey);
+  const candidateModels = Array.from(new Set([workingModelName, "gemini-1.5-flash", "gemini-1.5-pro"]));
+
   let responseText = null;
   let lastError = null;
 
