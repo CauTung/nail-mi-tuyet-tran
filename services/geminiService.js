@@ -25,6 +25,14 @@ Quy đổi các ký tự viết tắt tiền tệ (Ví dụ: 100k = 100000, 1tr 
 2. "mi": Nối mi, uốn mi, xăm mày, phun môi...
 3. "ngoai_gio": Tăng ca, làm ngoài giờ, khách đặt muộn...
 
+### QUY TẮC PHÂN TÍCH CÁC DÒNG BỊ GẠCH XÓA / ĐIỀU CHỈNH (DELETED ITEMS):
+- Nếu phát hiện các dòng bị gạch ngang, gạch xóa, gạch đè:
+  1. KHÔNG tính tiền từ các dòng này vào doanh thu hay chi tiêu chính.
+  2. Bắt buộc trích xuất danh sách các dòng bị xóa này vào mảng "deleted_items" bao gồm:
+     - "content": Nội dung ban đầu của dòng bị gạch xóa (ví dụ: "Huệ gội móng 200k").
+     - "original_amount": Số tiền ghi trong dòng đó nếu có (số nguyên, ví dụ: 200000).
+     - "reason": Lý do xóa nếu ghi bên cạnh (ví dụ: "Khách hủy", "Ghi nhầm", "Chủ xóa", hoặc "Không có lý do").
+
 ### QUY TẮC PHÂN TÍCH CÁC KHOẢN CHI TIÊU & TRẢ GÓP (EXPENSES & INSTALLMENTS):
 1. Chi tiêu trong ngày (EXPENSES): Nước đá, tiền ship, đồ ăn, trả tiền điện, hóa chất... Trích xuất "amount" (số nguyên) và "notes".
 2. **KHOẢN MUA TRẢ GÓP MỚI (INSTALLMENTS)**: Nếu trong báo cáo có ghi nhận mua máy móc/thiết bị/tài sản dạng trả góp (Ví dụ: "Mua máy 10.3tr trả góp 6 tháng", "Sắm ghế 12tr góp 4 tháng"), hãy trích xuất thêm mảng "installments_data":
@@ -68,6 +76,13 @@ CẤU TRÚC JSON MẪU BẮT BUỘC TRẢ VỀ:
       "total_amount": 10300000,
       "months": 6,
       "monthly_amount": 1716667
+    }
+  ],
+  "deleted_items": [
+    {
+      "content": "Quỳnh Anh uốn mi 250k",
+      "original_amount": 250000,
+      "reason": "Khách đổi lịch"
     }
   ]
 }`;

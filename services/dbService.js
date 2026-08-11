@@ -428,6 +428,7 @@ function getDailySummary(dateStr) {
   let totalExpenses = 0;
   const staffStats = {};
   const expensesList = [];
+  const deletedItemsList = [];
 
   reports.forEach(r => {
     const parsed = r.parsed_result;
@@ -460,6 +461,16 @@ function getDailySummary(dateStr) {
         });
       });
     }
+
+    if (Array.isArray(parsed.deleted_items)) {
+      parsed.deleted_items.forEach(del => {
+        deletedItemsList.push({
+          content: del.content || "Dòng bị gạch xóa",
+          original_amount: del.original_amount || 0,
+          reason: del.reason || "Không có lý do"
+        });
+      });
+    }
   });
 
   const totalRevenue = totalGoiMong + totalMi + totalNgoaiGio;
@@ -479,6 +490,7 @@ function getDailySummary(dateStr) {
       total: totalExpenses,
       list: expensesList
     },
+    deletedItems: deletedItemsList,
     netProfit,
     staffStats
   };

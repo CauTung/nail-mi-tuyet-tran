@@ -304,6 +304,15 @@ function formatDailySummaryMessage(summary) {
     });
   }
 
+  let deletedDetailText = "";
+  if (Array.isArray(summary.deletedItems) && summary.deletedItems.length > 0) {
+    deletedDetailText = "\n🗑 **Các dòng bị gạch xóa/hủy trong ngày (Không tính tiền):**\n";
+    summary.deletedItems.forEach(d => {
+      const amtStr = d.original_amount > 0 ? ` (${d.original_amount.toLocaleString("vi-VN")} VNĐ)` : "";
+      deletedDetailText += `  • ~${d.content}~${amtStr} -> _Lý do: ${d.reason}_\n`;
+    });
+  }
+
   let reportsListText = "\n🆔 **Danh sách mã lượt báo cáo (để sửa/xóa nếu cần):**\n";
   summary.reports.forEach((r, idx) => {
     reportsListText += `  • Lượt ${summary.reports.length - idx} (lúc ${new Date(r.timestamp).toLocaleTimeString("vi-VN")}): Mã ID \`${r.id}\`\n`;
@@ -318,7 +327,8 @@ function formatDailySummaryMessage(summary) {
     `  • Mi/Nối mi/Phun xăm: ${summary.revenue.mi.toLocaleString("vi-VN")} VNĐ\n` +
     `  • Tăng ca/Ngoài giờ: ${summary.revenue.ngoai_gio.toLocaleString("vi-VN")} VNĐ\n\n` +
     `💸 **Tổng Chi Tiêu Ngày**: **${summary.expenses.total.toLocaleString("vi-VN")} VNĐ**\n` +
-    `${expenseDetailText}\n` +
+    `${expenseDetailText}` +
+    `${deletedDetailText}\n` +
     `📈 **LỢI NHUẬN RÒNG NGÀY**: **${summary.netProfit.toLocaleString("vi-VN")} VNĐ**\n\n` +
     `👩‍Working **Chi tiết nhân viên hôm nay:**\n${staffDetailText}` +
     `${reportsListText}`
