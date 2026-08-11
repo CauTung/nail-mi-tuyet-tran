@@ -4,6 +4,7 @@ const fetch = require("node-fetch");
 const { extractDailyReport } = require("./services/geminiService");
 const { 
   saveReportDb, 
+  savePhotoLogDb,
   deleteReportDb,
   updateStaffRevenueDb,
   updateExpenseDb,
@@ -12,6 +13,8 @@ const {
   saveStaffListDb,
   addStaffDb,
   removeStaffDb,
+  getCommissionConfigDb,
+  saveCommissionConfigDb,
   getDailyReports, 
   getDailySummary,
   getMonthlySummary, 
@@ -49,22 +52,22 @@ bot.start((ctx) => {
   const isAdmin = isAdminUser(userId);
 
   ctx.reply(
-    "👋 Chào mừng bạn đến với Telegram Bot OCR & Quản lý Báo cáo Tiệm Nail Mi Tuyết Trần!\n\n" +
-    "📸 Gửi **Ảnh chụp bảng viết tay**, **Ảnh chụp màn hình**, hoặc **Tin nhắn báo cáo**.\n" +
-    `🆔 **Telegram ID của bạn**: \`${userId}\` ${isAdmin ? "(👑 Chủ tiệm / Admin)" : "(Nhiên viên)"}\n\n` +
-    "Các lệnh tra cứu & quản lý:\n" +
-    "• /staff - Danh sách nhân viên\n" +
-    "• /today - Tổng hợp báo cáo hôm nay\n" +
-    "• /month [YYYY-MM] - Báo cáo tổng tháng & Lợi nhuận\n" +
-    "• /search YYYY-MM-DD - Tra cứu ngày bất kỳ\n" +
-    "• /tragop - Danh sách hợp đồng trả góp\n\n" +
-    "📅 **Nhập báo cáo ngày cũ (Khi mới dùng App):**\n" +
-    "• Ghi ngày trực tiếp trong tin nhắn (Ví dụ: *\"Ngày 05/08: Quỳnh Anh gội móng 300k\"*)\n" +
-    "• Hoặc gõ lệnh: `/addpast YYYY-MM-DD Nội_dung_báo_cáo`\n\n" +
-    "✏️ **Sửa & Xóa (Chủ tiệm):**\n" +
-    "• /editrevenue <ID> <Tên> <Gội/Móng> <Mi> <NgoàiGiờ>\n" +
-    "• /editexpense <ID> <Số_tiền> <Ghi_chú>\n" +
-    "• /deletereport <ID> - Xóa lượt báo cáo sai",
+    "👋 **Chào mừng bạn đến với Telegram Bot OCR & Quản lý Báo cáo Tiệm Nail Mi Tuyết Trần!**\n\n" +
+    "📸 Gửi **Ảnh chụp bảng viết tay**, **Ảnh chụp màn hình**, hoặc **Tin nhắn báo cáo** để tự động bóc tách thu chi.\n" +
+    `🆔 Telegram ID: \`${userId}\` ${isAdmin ? "(👑 Chủ tiệm / Admin)" : "(Nhân viên)"}\n\n` +
+    "📋 **DANH SÁCH CÁC LỆNH CHÍNH:**\n" +
+    "• /today - Tổng hợp thu chi & lợi nhuận hôm nay\n" +
+    "• /month [YYYY-MM] - Báo cáo tổng hợp tháng & Lợi nhuận\n" +
+    "• /luong [YYYY-MM] - Bảng lương & hoa hồng % doanh thu thợ\n" +
+    "• /export [YYYY-MM] - Xuất file Excel / CSV báo cáo tháng\n" +
+    "• /search YYYY-MM-DD - Tra cứu báo cáo ngày bất kỳ\n" +
+    "• /addpast YYYY-MM-DD Nội_dung - Nhập báo cáo ngày cũ\n" +
+    "• /tragop - Danh sách hợp đồng trả góp dài hạn\n\n" +
+    "👑 **Lệnh Chủ tiệm / Admin:**\n" +
+    "• /staff, /addstaff, /removestaff, /setstaff - Quản lý nhân viên\n" +
+    "• /setcommission <móng%> <mi%> <ngoài_giờ%> - Cài đặt % hoa hồng\n" +
+    "• /editrevenue, /editexpense, /deletereport - Sửa/xóa báo cáo\n\n" +
+    "📖 *Xem chi tiết hướng dẫn đầy đủ trong file README.md*",
     { parse_mode: "Markdown" }
   );
 });
@@ -348,7 +351,12 @@ bot.command(["month", "thang"], (ctx) => {
   let staffDetailText = "";
   Object.keys(summary.staffStats).forEach(name => {
     const s = summary.staffStats[name];
-    staffDetailText += `  • **${name}**: ${s.total_score} công | Doanh thu: ${s.total_revenue.toLocaleString("vi-VN")} VNĐ\n`;
+    let lateNoteText = "";
+    if (s.attendance_notes && s.attendance_notes.length > 0) {
+      const notesStr = s.attendance_notes.map(n => `${n.date}: ${n.note}`).join("; ");
+      lateNoteText = `\n    └ ⏰ Ghi chú đi muộn/ca: _${notesStr}_`;
+    }
+    staffDetailText += `  • **${name}**: ${s.total_score} công | Doanh thu: ${s.total_revenue.toLocaleString("vi-VN")} VNĐ${lateNoteText}\n`;
   });
 
   let installmentDetailText = "";
@@ -395,6 +403,50 @@ bot.command(["export", "xuatexcel"], (ctx) => {
   });
 });
 
+// CÀI ĐẶT % HOA HỒNG DOANH THU: /setcommission <móng%> <mi%> <ngoài_giờ%>
+bot.command(["setcommission", "sethoahong"], (ctx) => {
+  const userId = ctx.from ? ctx.from.id : null;
+  if (!isAdminUser(userId)) {
+    return ctx.reply("⛔ **Từ chối truy cập**: Chỉ có **Chủ tiệm / Admin** mới có quyền cài đặt % hoa hồng!");
+  }
+
+  const args = ctx.message.text.split(" ").filter(Boolean);
+  if (args.length < 4) {
+    const current = getCommissionConfigDb();
+    return ctx.reply(
+      `⚠️ **Cú pháp**: \`/setcommission <móng_%> <mi_%> <ngoài_giờ_%>\`\n` +
+      `Ví dụ: \`/setcommission 10 30 50\`\n\n` +
+      `📌 **Cấu hình hiện tại:**\n` +
+      ` • % Móng / Gội: **${current.goi_mong_percent}%**\n` +
+      ` • % Mi / Phun xăm: **${current.mi_percent}%**\n` +
+      ` • % Tăng ca / Ngoài giờ: **${current.ngoai_gio_percent}%**`,
+      { parse_mode: "Markdown" }
+    );
+  }
+
+  const goiMongP = parseFloat(args[1]);
+  const miP = parseFloat(args[2]);
+  const ngoaiGioP = parseFloat(args[3]);
+
+  if (isNaN(goiMongP) || isNaN(miP) || isNaN(ngoaiGioP)) {
+    return ctx.reply("⚠️ % hoa hồng phải là số hợp lệ!");
+  }
+
+  const updated = saveCommissionConfigDb({
+    goi_mong_percent: goiMongP,
+    mi_percent: miP,
+    ngoai_gio_percent: ngoaiGioP
+  });
+
+  ctx.reply(
+    `✅ **Đã cập nhật cấu hình % hoa hồng thành công!**\n` +
+    ` • Gội / Móng: **${updated.goi_mong_percent}%**\n` +
+    ` • Mi / Phun xăm: **${updated.mi_percent}%**\n` +
+    ` • Tăng ca / Ngoài giờ: **${updated.ngoai_gio_percent}%**`,
+    { parse_mode: "Markdown" }
+  );
+});
+
 // BẢNG LƯƠNG & DOANH SỐ CÔNG NHÂN VIÊN THÁNG (/luong hoặc /payroll)
 bot.command(["luong", "payroll"], (ctx) => {
   const args = ctx.message.text.split(" ");
@@ -406,12 +458,25 @@ bot.command(["luong", "payroll"], (ctx) => {
     return ctx.reply(`📅 **Chưa có dữ liệu cho tháng \`${targetYM}\`.**`);
   }
 
-  let text = `👩‍Working **BẢNG TỔNG HỢP CÔNG & DOANH SỐ THỢ THÁNG ${targetYM}**\n----------------------------------------\n\n`;
+  const cfg = summary.commissionConfig;
+  let text = `👩‍Working **BẢNG TỔNG HỢP CÔNG, DOANH SỐ & LƯƠNG % HOA HỒNG THÁNG ${targetYM}**\n` +
+             `📌 Config %: Móng ${cfg.goi_mong_percent}% | Mi ${cfg.mi_percent}% | Tăng ca ${cfg.ngoai_gio_percent}%\n----------------------------------------\n\n`;
+
   Object.keys(summary.staffStats).forEach((name, idx) => {
     const s = summary.staffStats[name];
+    let lateNoteText = "";
+    if (s.attendance_notes && s.attendance_notes.length > 0) {
+      const notesStr = s.attendance_notes.map(n => `${n.date}: ${n.note}`).join("; ");
+      lateNoteText = `   • Ghi chú đi muộn/ca: _${notesStr}_\n`;
+    }
+
     text += `${idx + 1}. **${name}**:\n`;
     text += `   • Số ngày/công làm: **${s.total_score} công**\n`;
-    text += `   • Tổng doanh số mang về: **${s.total_revenue.toLocaleString("vi-VN")} VNĐ**\n\n`;
+    text += `   • Doanh số Gội/Móng: ${s.total_goi_mong.toLocaleString("vi-VN")} VNĐ (${cfg.goi_mong_percent}% = **${s.commission_goi_mong.toLocaleString("vi-VN")} VNĐ**)\n`;
+    text += `   • Doanh số Mi: ${s.total_mi.toLocaleString("vi-VN")} VNĐ (${cfg.mi_percent}% = **${s.commission_mi.toLocaleString("vi-VN")} VNĐ**)\n`;
+    text += `   • Doanh số Tăng ca: ${s.total_ngoai_gio.toLocaleString("vi-VN")} VNĐ (${cfg.ngoai_gio_percent}% = **${s.commission_ngoai_gio.toLocaleString("vi-VN")} VNĐ**)\n`;
+    text += `   • Tổng doanh số mang về: **${s.total_revenue.toLocaleString("vi-VN")} VNĐ**\n`;
+    text += `   👉 **TỔNG LƯƠNG % HOA HỒNG DOANH THU: ${s.total_commission.toLocaleString("vi-VN")} VNĐ**\n${lateNoteText}\n`;
   });
 
   ctx.reply(text, { parse_mode: "Markdown" });
@@ -472,6 +537,7 @@ bot.on("text", async (ctx) => {
 bot.on("photo", async (ctx) => {
   const caption = ctx.message.caption || "";
   const statusMsg = await ctx.reply("⏳ Đang tải và phân tích hình ảnh bảng báo cáo (OCR)...");
+  let imageBuffer = null;
 
   try {
     const photoArray = ctx.message.photo;
@@ -480,13 +546,16 @@ bot.on("photo", async (ctx) => {
     const fileUrl = await ctx.telegram.getFileLink(highestResPhoto.file_id);
     
     const response = await fetch(fileUrl.href);
-    const imageBuffer = await response.buffer();
+    imageBuffer = await response.buffer();
 
     const resultJson = await extractDailyReport({
       textInput: caption || undefined,
       imageBuffer: imageBuffer,
       mimeType: "image/jpeg"
     });
+
+    // Lưu vết log ảnh & kết quả OCR vào data/logs
+    const logInfo = savePhotoLogDb(imageBuffer, resultJson, null);
 
     const { record, dateStr } = saveReportDb(resultJson, {
       userInfo: ctx.from ? { id: ctx.from.id, username: ctx.from.username, first_name: ctx.from.first_name } : null,
@@ -502,11 +571,15 @@ bot.on("photo", async (ctx) => {
       noteText = `\n💳 **Hệ thống đã tự động lên lịch trả góp cho các tháng tới!** (Gõ \`/tragop\` để xem)`;
     }
 
-    await ctx.reply(`✅ **Đã OCR phân tích & lưu thành công vào ngày \`${dateStr}\`**\n🆔 Mã báo cáo: \`${record.id}\`${noteText}\n\n\`\`\`json\n${jsonString}\n\`\`\``, { parse_mode: "Markdown" });
+    await ctx.reply(`✅ **Đã OCR phân tích & lưu thành công vào ngày \`${dateStr}\`**\n🆔 Mã báo cáo: \`${record.id}\` | Log ID: \`${logInfo.baseName}\`${noteText}\n\n\`\`\`json\n${jsonString}\n\`\`\``, { parse_mode: "Markdown" });
   } catch (error) {
     console.error("Lỗi khi bóc tách hình ảnh OCR:", error);
+    // Lưu log hình ảnh thất bại để chủ tiệm / dev kiểm tra lại
+    if (imageBuffer) {
+      savePhotoLogDb(imageBuffer, null, error.message || "Lỗi xử lý OCR");
+    }
     await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id).catch(() => {});
-    await ctx.reply(`❌ **Có lỗi xảy ra khi đọc ảnh:** ${error.message || "Lỗi xử lý OCR"}`);
+    await ctx.reply(`❌ **Có lỗi xảy ra khi đọc ảnh:** ${error.message || "Lỗi xử lý OCR"}\n*(Ảnh đã được lưu vào hệ thống log để hỗ trợ kiểm tra lại)*`);
   }
 });
 

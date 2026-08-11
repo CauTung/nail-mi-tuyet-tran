@@ -41,7 +41,7 @@ CẤU TRÚC JSON MẪU BẮT BUỘC TRẢ VỀ:
   "status": "success",
   "has_warning": false,
   "warning_message": "",
-  "report_date": "2026-08-05", // BẮT BUỘC: Nếu trên trang sổ viết tay/hình ảnh hoặc caption có ghi ngày (Ví dụ: "Ngày 05/08", "05/08/2026", "2026-08-05"), hãy trích xuất chính xác theo định dạng YYYY-MM-DD. Nếu không ghi năm thì dùng năm hiện tại. Nếu hoàn toàn không thấy ngày thì để null.
+  "report_date": "2026-08-05", // BẮT BUỘC: Nếu trên trang sổ viết tay/hình ảnh hoặc caption có ghi ngày (Ví dụ: "Ngày 05/08", "05/08/2026", "2026-08-05"), hãy trích xuất chính xác theo định dạng YYYY-MM-DD. NĂM MẶC ĐỊNH LUÔN LÀ NĂM HIỆN TẠI (2026). TUYỆT ĐỐI KHÔNG ĐOÁN LÀ NĂM 2024 NẾU KHÔNG CÓ GHI NĂM. Nếu hoàn toàn không thấy ngày thì để null.
   "staff_data": [
     {
       "name": "Hoa",

@@ -3,9 +3,17 @@ const path = require("path");
 
 const DATA_DIR = path.join(__dirname, "../data");
 const REPORTS_DIR = path.join(DATA_DIR, "reports");
+const LOGS_DIR = path.join(DATA_DIR, "logs");
 const STAFF_FILE = path.join(DATA_DIR, "staff.json");
 const ADMINS_FILE = path.join(DATA_DIR, "admins.json");
 const INSTALLMENTS_FILE = path.join(DATA_DIR, "installments.json");
+const COMMISSION_FILE = path.join(DATA_DIR, "commission_config.json");
+
+const DEFAULT_COMMISSION = {
+  goi_mong_percent: 10,
+  mi_percent: 30,
+  ngoai_gio_percent: 50
+};
 
 function initDb() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -14,6 +22,10 @@ function initDb() {
 
   if (!fs.existsSync(REPORTS_DIR)) {
     fs.mkdirSync(REPORTS_DIR, { recursive: true });
+  }
+
+  if (!fs.existsSync(LOGS_DIR)) {
+    fs.mkdirSync(LOGS_DIR, { recursive: true });
   }
 
   if (!fs.existsSync(STAFF_FILE)) {
@@ -32,6 +44,32 @@ function initDb() {
   if (!fs.existsSync(INSTALLMENTS_FILE)) {
     fs.writeFileSync(INSTALLMENTS_FILE, JSON.stringify([], null, 2), "utf-8");
   }
+
+  if (!fs.existsSync(COMMISSION_FILE)) {
+    fs.writeFileSync(COMMISSION_FILE, JSON.stringify(DEFAULT_COMMISSION, null, 2), "utf-8");
+  }
+}
+
+function getCommissionConfigDb() {
+  initDb();
+  try {
+    const data = fs.readFileSync(COMMISSION_FILE, "utf-8");
+    return { ...DEFAULT_COMMISSION, ...JSON.parse(data) };
+  } catch (err) {
+    return DEFAULT_COMMISSION;
+  }
+}
+
+function saveCommissionConfigDb(config) {
+  initDb();
+  const current = getCommissionConfigDb();
+  const updated = {
+    goi_mong_percent: config.goi_mong_percent !== undefined ? Number(config.goi_mong_percent) : current.goi_mong_percent,
+    mi_percent: config.mi_percent !== undefined ? Number(config.mi_percent) : current.mi_percent,
+    ngoai_gio_percent: config.ngoai_gio_percent !== undefined ? Number(config.ngoai_gio_percent) : current.ngoai_gio_percent
+  };
+  fs.writeFileSync(COMMISSION_FILE, JSON.stringify(updated, null, 2), "utf-8");
+  return updated;
 }
 
 function getDateKeys(dateObj = new Date()) {
@@ -200,6 +238,12 @@ function saveReportDb(reportData, metaInfo = {}, explicitDate = null) {
   if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
     const { dateStr } = getDateKeys(now);
     targetDate = dateStr;
+  } else {
+    // Sửa lỗi nếu AI đoán năm cũ (< 2026) thành 2026
+    const parts = targetDate.split("-");
+    if (parseInt(parts[0], 10) < 2026) {
+      targetDate = `2026-${parts[1]}-${parts[2]}`;
+    }
   }
 
   const [year, month] = targetDate.split("-");
@@ -455,6 +499,7 @@ function getMonthlySummary(yearMonth) {
   let totalDirectExpenses = 0;
   let totalReportsCount = 0;
   const staffStats = {};
+  const commissionConfig = getCommissionConfigDb();
 
   files.forEach(file => {
     const filePath = path.join(monthFolder, file);
@@ -475,10 +520,43 @@ function getMonthlySummary(yearMonth) {
             totalRevenueNgoaiGio += ngoaiGio;
 
             if (!staffStats[s.name]) {
-              staffStats[s.name] = { total_score: 0, total_revenue: 0 };
+              staffStats[s.name] = { 
+                total_score: 0, 
+                total_goi_mong: 0,
+                total_mi: 0,
+                total_ngoai_gio: 0,
+                total_revenue: 0, 
+                commission_goi_mong: 0,
+                commission_mi: 0,
+                commission_ngoai_gio: 0,
+                total_commission: 0,
+                attendance_notes: [] 
+              };
             }
             staffStats[s.name].total_score += (s.attendance_score || 0);
+            staffStats[s.name].total_goi_mong += goiMong;
+            staffStats[s.name].total_mi += mi;
+            staffStats[s.name].total_ngoai_gio += ngoaiGio;
             staffStats[s.name].total_revenue += (goiMong + mi + ngoaiGio);
+
+            const commGM = Math.round(goiMong * (commissionConfig.goi_mong_percent / 100));
+            const commMi = Math.round(mi * (commissionConfig.mi_percent / 100));
+            const commNG = Math.round(ngoaiGio * (commissionConfig.ngoai_gio_percent / 100));
+
+            staffStats[s.name].commission_goi_mong += commGM;
+            staffStats[s.name].commission_mi += commMi;
+            staffStats[s.name].commission_ngoai_gio += commNG;
+            staffStats[s.name].total_commission += (commGM + commMi + commNG);
+
+            if (s.attendance_description) {
+              const desc = s.attendance_description.trim();
+              if (desc && desc !== "Làm cả ngày") {
+                staffStats[s.name].attendance_notes.push({
+                  date: rep.date || file.replace(".json", ""),
+                  note: desc
+                });
+              }
+            }
           });
         }
 
@@ -507,6 +585,7 @@ function getMonthlySummary(yearMonth) {
     yearMonth,
     daysCount: files.length,
     totalReportsCount,
+    commissionConfig,
     revenue: {
       goi_mong: totalRevenueGoiMong,
       mi: totalRevenueMi,
@@ -532,10 +611,12 @@ function exportMonthlyCsv(yearMonth) {
   const monthFolder = path.join(REPORTS_DIR, yearMonth);
   if (!fs.existsSync(monthFolder)) return null;
 
+  const commissionConfig = getCommissionConfigDb();
   const files = fs.readdirSync(monthFolder).filter(f => f.endsWith(".json")).sort();
 
   let csvContent = "\uFEFF"; // UTF-8 BOM cho Excel mở tiếng Việt không lỗi font
-  csvContent += "Ngày,Mã Báo Cáo,Tên Nhân Viên,Công (Score),Gội/Móng (VNĐ),Mi/Phun Xăm (VNĐ),Tăng Ca (VNĐ),Tổng Doanh Thu NV (VNĐ),Khoản Chi Tiêu,Số Tiền Chi (VNĐ)\n";
+  csvContent += `Cấu hình hoa hồng % lương: Gội/Móng ${commissionConfig.goi_mong_percent}%, Mi/Phun xăm ${commissionConfig.mi_percent}%, Tăng ca ${commissionConfig.ngoai_gio_percent}%\n`;
+  csvContent += "Ngày,Mã Báo Cáo,Tên Nhân Viên,Công (Score),Thời Gian / Ghi Chú Đi Muộn,Gội/Móng (VNĐ),Mi/Phun Xăm (VNĐ),Tăng Ca (VNĐ),Tổng Doanh Thu Lượt (VNĐ),Hoa Hồng Gội/Móng (VNĐ),Hoa Hồng Mi (VNĐ),Hoa Hồng Tăng Ca (VNĐ),Tổng Hoa Hồng Lượt (VNĐ),Khoản Chi Tiêu,Số Tiền Chi (VNĐ)\n";
 
   files.forEach(file => {
     const filePath = path.join(monthFolder, file);
@@ -556,23 +637,75 @@ function exportMonthlyCsv(yearMonth) {
 
           const sName = s.name ? `"${s.name}"` : "";
           const sScore = s.attendance_score !== undefined ? s.attendance_score : "";
+          const sAttendance = s.attendance_description ? `"${s.attendance_description.replace(/"/g, '""')}"` : "";
           const sGoiMong = s.revenue?.goi_mong || 0;
           const sMi = s.revenue?.mi || 0;
           const sNgoaiGio = s.revenue?.ngoai_gio || 0;
           const sTotal = (sGoiMong + sMi + sNgoaiGio) || 0;
 
+          let commGM = 0, commMi = 0, commNG = 0, commTotal = 0;
+          if (s.name) {
+            commGM = Math.round(sGoiMong * (commissionConfig.goi_mong_percent / 100));
+            commMi = Math.round(sMi * (commissionConfig.mi_percent / 100));
+            commNG = Math.round(sNgoaiGio * (commissionConfig.ngoai_gio_percent / 100));
+            commTotal = commGM + commMi + commNG;
+          }
+
           const eNotes = e.notes ? `"${e.notes.replace(/"/g, '""')}"` : "";
           const eAmount = e.amount || 0;
 
-          csvContent += `${date},${repId},${sName},${sScore},${sGoiMong},${sMi},${sNgoaiGio},${sTotal},${eNotes},${eAmount}\n`;
+          csvContent += `${date},${repId},${sName},${sScore},${sAttendance},${sGoiMong},${sMi},${sNgoaiGio},${sTotal},${commGM},${commMi},${commNG},${commTotal},${eNotes},${eAmount}\n`;
         }
       });
     } catch (err) {}
   });
 
+  // Thêm bảng tổng hợp lương nhân viên ở cuối file CSV
+  const summary = getMonthlySummary(yearMonth);
+  if (summary && summary.staffStats) {
+    csvContent += "\n--- BẢNG TỔNG HỢP LƯƠNG & HOA HỒNG NHÂN VIÊN THÁNG ---\n";
+    csvContent += "Tên Nhân Viên,Tổng Công (Score),Tổng Gội/Móng (VNĐ),Tổng Mi/Phun Xăm (VNĐ),Tổng Tăng Ca (VNĐ),Tổng Doanh Thu NV (VNĐ),Lương % Gội/Móng (10%),Lương % Mi (30%),Lương % Tăng Ca (50%),TỔNG LƯƠNG % HOA HỒNG DOANH THU (VNĐ)\n";
+    Object.keys(summary.staffStats).forEach(name => {
+      const st = summary.staffStats[name];
+      csvContent += `"${name}",${st.total_score},${st.total_goi_mong},${st.total_mi},${st.total_ngoai_gio},${st.total_revenue},${st.commission_goi_mong},${st.commission_mi},${st.commission_ngoai_gio},${st.total_commission}\n`;
+    });
+  }
+
   const exportPath = path.join(DATA_DIR, `BaoCao_NailMi_TuyetTran_${yearMonth}.csv`);
   fs.writeFileSync(exportPath, csvContent, "utf-8");
   return exportPath;
+}
+
+/**
+ * Lưu vết hình ảnh và kết quả bóc tách OCR vào data/logs
+ */
+function savePhotoLogDb(imageBuffer, parsedResult, errorMsg = null) {
+  initDb();
+  const timestamp = Date.now();
+  const dateFolder = new Date().toISOString().substring(0, 10);
+  const targetDir = path.join(LOGS_DIR, dateFolder);
+
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+  }
+
+  const baseName = `ocr_${timestamp}`;
+  if (imageBuffer) {
+    const imgPath = path.join(targetDir, `${baseName}.jpg`);
+    fs.writeFileSync(imgPath, imageBuffer);
+  }
+
+  const logMeta = {
+    timestamp: new Date().toISOString(),
+    status: errorMsg ? "error" : "success",
+    error: errorMsg || null,
+    parsed_result: parsedResult || null
+  };
+
+  const jsonPath = path.join(targetDir, `${baseName}.json`);
+  fs.writeFileSync(jsonPath, JSON.stringify(logMeta, null, 2), "utf-8");
+
+  return { baseName, dateFolder };
 }
 
 module.exports = {
@@ -584,11 +717,14 @@ module.exports = {
   getAdminListDb,
   isAdminUser,
   addAdminUser,
+  getCommissionConfigDb,
+  saveCommissionConfigDb,
   getInstallmentsDb,
   saveInstallmentsDb,
   deleteInstallmentDb,
   getActiveInstallmentsForMonth,
   saveReportDb,
+  savePhotoLogDb,
   deleteReportDb,
   updateStaffRevenueDb,
   updateExpenseDb,

@@ -84,13 +84,14 @@ Bot sẽ khởi chạy với thông báo: `🚀 Telegram Spa/Salon OCR Bot đã 
 | :--- | :--- |
 | **`/addpast YYYY-MM-DD Nội_dung`** | Nhập bổ sung báo cáo cho một ngày trong quá khứ (Ví dụ: `/addpast 2026-08-01 Quỳnh Anh gội móng 300k`). |
 
-### 👑 Lệnh Dành Cho Admin (Quản Lý Nhân Viên)
+### 👑 Lệnh Dành Cho Admin (Quản Lý Nhân Viên & Hoa Hồng)
 | Lệnh | Mô tả |
 | :--- | :--- |
 | **`/staff`** | Xem danh sách nhân viên hợp lệ hiện tại đang áp dụng. |
 | **`/addstaff Tên1, Tên2`** | Thêm nhân viên mới vào danh sách đối chiếu. |
 | **`/removestaff Tên`** | Xóa nhân viên đã nghỉ khỏi danh sách. |
 | **`/setstaff Tên1, Tên2...`** | Đặt lại toàn bộ danh sách nhân viên chuẩn cho tiệm. |
+| **`/setcommission <móng%> <mi%> <ngoài_giờ%>`** | Cài đặt tỷ lệ % hoa hồng doanh thu (Ví dụ: `/setcommission 10 30 50`). |
 
 ### ✏️ Lệnh Dành Cho Admin (Chỉnh Sửa & Xóa Thu Chi)
 | Lệnh | Mô tả |
