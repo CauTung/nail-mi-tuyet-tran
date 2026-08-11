@@ -15,7 +15,7 @@ INSERT INTO staff (name, is_active) VALUES
   ('Quỳnh Anh', true),
   ('Huệ', true),
   ('chị Cúc', true),
-  ('Thảo (Công chúa)', true),
+  ('Thảo', true),
   ('Nhi', true)
 ON CONFLICT (name) DO NOTHING;
 
