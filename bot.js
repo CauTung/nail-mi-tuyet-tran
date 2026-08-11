@@ -599,6 +599,16 @@ if (botToken && botToken !== "your_telegram_bot_token_here") {
     .then(() => console.log("🚀 Telegram Spa/Salon OCR Bot đã khởi chạy thành công!"))
     .catch((err) => console.error("Lỗi khởi chạy Telegram Bot:", err));
 
+  // Thêm HTTP Server nhỏ để Render Web Service nhận Health Check (Port 10000 hoặc process.env.PORT)
+  const http = require("http");
+  const PORT = process.env.PORT || 10000;
+  http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("🤖 Telegram Bot Spa Nail Mi Tuyết Trần đang hoạt động 24/7!");
+  }).listen(PORT, () => {
+    console.log(`🌐 Health check server running on port ${PORT}`);
+  });
+
   process.once("SIGINT", () => bot.stop("SIGINT"));
   process.once("SIGTERM", () => bot.stop("SIGTERM"));
 } else {
