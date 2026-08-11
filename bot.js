@@ -480,8 +480,9 @@ bot.command(["luong", "payroll"], (ctx) => {
       lateNoteText = `   • Ghi chú đi muộn/ca: _${notesStr}_\n`;
     }
 
+    const lateStr = s.days_late > 0 ? `${s.days_late} lần (${s.late_minutes} phút)` : "0 lần";
     text += `${idx + 1}. **${name}**:\n`;
-    text += `   • Điểm công: **${s.total_score} công** (Làm: ${s.days_worked} ngày | Nghỉ: ${s.days_off} ngày | Muộn: ${s.days_late} lần)\n`;
+    text += `   • Điểm công: **${s.total_score} công** (Làm: ${s.days_worked} ngày | Nghỉ: ${s.days_off} ngày | Muộn: ${lateStr})\n`;
     text += `   • Doanh số Gội/Móng: ${s.total_goi_mong.toLocaleString("vi-VN")} VNĐ (${cfg.goi_mong_percent}% = **${s.commission_goi_mong.toLocaleString("vi-VN")} VNĐ**)\n`;
     text += `   • Doanh số Mi: ${s.total_mi.toLocaleString("vi-VN")} VNĐ (${cfg.mi_percent}% = **${s.commission_mi.toLocaleString("vi-VN")} VNĐ**)\n`;
     text += `   • Doanh số Tăng ca: ${s.total_ngoai_gio.toLocaleString("vi-VN")} VNĐ (${cfg.ngoai_gio_percent}% = **${s.commission_ngoai_gio.toLocaleString("vi-VN")} VNĐ**)\n`;

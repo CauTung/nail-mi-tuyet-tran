@@ -537,6 +537,7 @@ function getMonthlySummary(yearMonth) {
                 days_worked: 0,
                 days_off: 0,
                 days_late: 0,
+                late_minutes: 0,
                 total_goi_mong: 0,
                 total_mi: 0,
                 total_ngoai_gio: 0,
@@ -575,6 +576,10 @@ function getMonthlySummary(yearMonth) {
               if (desc && desc !== "Làm cả ngày") {
                 if (desc.toLowerCase().includes("muộn")) {
                   staffStats[s.name].days_late += 1;
+                  const match = desc.match(/(\d+)\s*phút/i) || desc.match(/muộn\s*(\d+)/i);
+                  if (match) {
+                    staffStats[s.name].late_minutes += parseInt(match[1], 10);
+                  }
                 }
                 staffStats[s.name].attendance_notes.push({
                   date: rep.date || file.replace(".json", ""),
@@ -689,10 +694,10 @@ function exportMonthlyCsv(yearMonth) {
   const summary = getMonthlySummary(yearMonth);
   if (summary && summary.staffStats) {
     csvContent += "\n--- BẢNG TỔNG HỢP LƯƠNG & HOA HỒNG NHÂN VIÊN THÁNG ---\n";
-    csvContent += "Tên Nhân Viên,Tổng Công (Score),Số Ngày Làm,Số Ngày Nghỉ,Số Lần Muộn,Tổng Gội/Móng (VNĐ),Tổng Mi/Phun Xăm (VNĐ),Tổng Tăng Ca (VNĐ),Tổng Doanh Thu NV (VNĐ),Lương % Gội/Móng (10%),Lương % Mi (30%),Lương % Tăng Ca (50%),TỔNG LƯƠNG % HOA HỒNG DOANH THU (VNĐ)\n";
+    csvContent += "Tên Nhân Viên,Tổng Công (Score),Số Ngày Làm,Số Ngày Nghỉ,Số Lần Muộn,Tổng Phút Muộn,Tổng Gội/Móng (VNĐ),Tổng Mi/Phun Xăm (VNĐ),Tổng Tăng Ca (VNĐ),Tổng Doanh Thu NV (VNĐ),Lương % Gội/Móng (10%),Lương % Mi (30%),Lương % Tăng Ca (50%),TỔNG LƯƠNG % HOA HỒNG DOANH THU (VNĐ)\n";
     Object.keys(summary.staffStats).forEach(name => {
       const st = summary.staffStats[name];
-      csvContent += `"${name}",${st.total_score},${st.days_worked},${st.days_off},${st.days_late},${st.total_goi_mong},${st.total_mi},${st.total_ngoai_gio},${st.total_revenue},${st.commission_goi_mong},${st.commission_mi},${st.commission_ngoai_gio},${st.total_commission}\n`;
+      csvContent += `"${name}",${st.total_score},${st.days_worked},${st.days_off},${st.days_late},${st.late_minutes},${st.total_goi_mong},${st.total_mi},${st.total_ngoai_gio},${st.total_revenue},${st.commission_goi_mong},${st.commission_mi},${st.commission_ngoai_gio},${st.total_commission}\n`;
     });
   }
 
