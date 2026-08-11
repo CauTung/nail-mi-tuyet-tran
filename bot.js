@@ -1,3 +1,4 @@
+const http = require("http");
 const { createBotApp } = require("./bot/botApp");
 const env = require("./config/env");
 
@@ -5,6 +6,15 @@ async function start() {
   console.log("--------------------------------------------------");
   console.log("💅 Nail Mi Tuyết Trần - Telegram Bot AI OCR");
   console.log("--------------------------------------------------");
+
+  // Khởi tạo HTTP Health-Check Server cho Render.com nhận diện Cổng (Port)
+  const port = process.env.PORT || 10000;
+  http.createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end("💅 Bot Nail Mi Tuyết Trần đang hoạt động Online 24/7 trên Render!");
+  }).listen(port, () => {
+    console.log(`🌐 [HTTP HEALTH-CHECK] Đã mở cổng PORT ${port} cho Render.com kiểm tra Web Service.`);
+  });
 
   try {
     const bot = createBotApp();
