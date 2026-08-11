@@ -43,6 +43,22 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
   const yearMonth = `${year}-${month}`;
   const reportId = `REP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
+  // Nếu chọn chế độ thay thế (replace_all), xóa các báo cáo cũ trong cùng ngày
+  if (reportData.replacement_mode === "replace_all") {
+    if (isSupabaseConnected()) {
+      try {
+        await supabase.from("reports").delete().eq("report_date", targetDate);
+      } catch (e) {
+        console.error("Lỗi xóa báo cáo cũ trên Supabase:", e);
+      }
+    }
+    const monthFolder = path.join(REPORTS_DIR, yearMonth);
+    const dailyFile = path.join(monthFolder, `${targetDate}.json`);
+    if (fs.existsSync(dailyFile)) {
+      try { fs.writeFileSync(dailyFile, JSON.stringify([], null, 2), "utf-8"); } catch (e) {}
+    }
+  }
+
   const record = {
     id: reportId,
     timestamp: now.toISOString(),
@@ -81,6 +97,16 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
         report_date: targetDate,
         user_info: metaInfo.userInfo || null,
         input_type: metaInfo.inputType || "text",
+        raw_data: reportData,
+        created_at: now.toISOString()
+      });
+
+      // Ghi log lịch sử ocr_logs
+      await supabase.from("ocr_logs").insert({
+        log_id: reportId,
+        report_date: targetDate,
+        input_type: metaInfo.inputType || "text",
+        user_info: metaInfo.userInfo || null,
         raw_data: reportData,
         created_at: now.toISOString()
       });

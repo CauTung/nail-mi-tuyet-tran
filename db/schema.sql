@@ -88,3 +88,17 @@ CREATE TABLE IF NOT EXISTS installments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_installments_start_ym ON installments(start_year_month);
+
+-- 8. Table: ocr_logs (Lưu vết lịch sử tất cả các lần gửi ảnh/tin nhắn OCR)
+CREATE TABLE IF NOT EXISTS ocr_logs (
+    id SERIAL PRIMARY KEY,
+    log_id VARCHAR(100) NOT NULL,
+    report_date DATE,
+    input_type VARCHAR(50) DEFAULT 'photo',
+    user_info JSONB,
+    raw_data JSONB,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ocr_logs_date ON ocr_logs(report_date);
+

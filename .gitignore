@@ -2,4 +2,7 @@ node_modules/
 .env
 *.log
 data/*.csv
+data/*.json
+data/reports/
 data/logs/
+

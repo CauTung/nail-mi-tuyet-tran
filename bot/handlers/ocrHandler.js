@@ -93,6 +93,9 @@ async function handleOcrMessage(ctx, next) {
     let result = null;
     let imageBuffer = null;
 
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const existingReports = await reportRepo.getDailyReports(todayStr);
+
     if (photo && photo.length > 0) {
       const highestResPhoto = photo[photo.length - 1];
       const fileUrl = await ctx.telegram.getFileLink(highestResPhoto.file_id);
@@ -104,14 +107,16 @@ async function handleOcrMessage(ctx, next) {
         textInput: textMsg,
         imageBuffer,
         mimeType: "image/jpeg",
-        customStaffList: currentStaff
+        customStaffList: currentStaff,
+        existingReports
       });
       reportRepo.savePhotoLog(imageBuffer, result);
     } else if (textMsg.trim().length > 0) {
       const currentStaff = await staffRepo.getStaffList();
       result = await aiService.extractDailyReport({
         textInput: textMsg,
-        customStaffList: currentStaff
+        customStaffList: currentStaff,
+        existingReports
       });
       reportRepo.savePhotoLog(null, result);
     } else {

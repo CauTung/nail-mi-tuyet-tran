@@ -47,6 +47,11 @@ Quy đổi các ký tự viết tắt tiền tệ (Ví dụ: 100k = 100000, 1tr 
    - "months": Số tháng trả góp (số nguyên, ví dụ: 6).
    - "monthly_amount": Số tiền tự chia trung bình mỗi tháng = Math.round(total_amount / months).
 
+### QUY TẮC SO SÁNH VỚI DỮ LIỆU ĐÃ CÓ TRONG NGÀY (EXISTING REPORTS):
+Nếu có danh sách các lượt báo cáo đã gửi trước đó trong cùng ngày:
+1. **Thay thế / Cập nhật bản mới nhất (replacement_mode: "replace_all")**: Nếu tin nhắn hoặc ảnh mới là BẢN TỔNG KẾT CUỐI NGÀY hoặc BẢN SỬA LẠI (chủ tiệm hoặc thợ chụp lại trang sổ toàn bộ ngày hay gửi bản đính chính), hãy tổng hợp số liệu chuẩn mới nhất của cả ngày và chọn `"replacement_mode": "replace_all"`.
+2. **Cộng dồn bổ sung (replacement_mode: "append")**: Nếu tin nhắn hoặc ảnh mới chỉ là lượt làm riêng biệt/bổ sung thêm của thợ khác gửi mà chưa có trong báo cáo trước, chọn `"replacement_mode": "append"`.
+
 ### QUY TẮC PHÂN BIỆT BÁO CÁO THU CHI VS TRÒ CHUYỆN THÔNG THƯỜNG (CHAT):
 1. **BÁO CÁO THU CHI (is_financial_report: true)**: Tin nhắn hoặc hình ảnh có chứa số tiền, tên nhân viên, công xá, dịch vụ gội/móng/mi/tóc, chi tiêu, hoặc ảnh chụp trang sổ báo cáo.
 2. **TRÒ CHUYỆN / HỎI ĐÁP THÔNG THƯỜNG (is_financial_report: false)**:
@@ -60,6 +65,7 @@ CẤU TRÚC JSON MẪU 1 (DÀNH CHO BÁO CÁO THU CHI):
 {
   "status": "success",
   "is_financial_report": true,
+  "replacement_mode": "replace_all", // "replace_all" (nếu là ảnh mới nhất đè lên bản cũ) hoặc "append" (nếu cộng dồn)
   "has_warning": false,
   "warning_message": "",
   "report_date": "2026-08-05",
@@ -77,7 +83,7 @@ CẤU TRÚC JSON MẪU 2 (DÀNH CHO TRÒ CHUYỆN / HỎI ĐÁP CHUNG):
 }`;
 }
 
-async function extractDailyReport({ textInput, imageBuffer, mimeType = "image/jpeg", customStaffList }) {
+async function extractDailyReport({ textInput, imageBuffer, mimeType = "image/jpeg", customStaffList, existingReports }) {
   const apiKey = env.geminiApiKey;
   if (!apiKey) {
     throw new Error("Chưa cấu hình GEMINI_API_KEY trong file .env!");
@@ -99,6 +105,10 @@ async function extractDailyReport({ textInput, imageBuffer, mimeType = "image/jp
       const systemPrompt = getSystemPrompt(activeStaffList);
 
       const contents = [systemPrompt];
+
+      if (existingReports && existingReports.length > 0) {
+        contents.push(`DANH SÁCH BÁO CÁO ĐÃ GHI NHẬN TRƯỚC ĐÓ TRONG NGÀY HÔM NAY:\n${JSON.stringify(existingReports, null, 2)}`);
+      }
 
       if (textInput) {
         contents.push(`Dữ liệu báo cáo dạng văn bản:\n"""${textInput}"""`);
