@@ -31,16 +31,16 @@ Nhiệm vụ của bạn là phân tích hình ảnh (bảng viết tay, ảnh c
    - Ví dụ: "Nghỉ 1/4 ngày" (tức là làm 3/4 ngày) -> attendance_score: 0.75
    - Nếu không có ghi chú gì đặc biệt về thời gian nghỉ, mặc định là làm cả ngày -> attendance_score: 1.0
 
-### QUY TẮC PHÂN TÍCH DOANH SỐ DỊCH VỤ (SERVICES & KHU VỰC TRÊN SỔ/ẢNH):
-Quy đổi các ký tự viết tắt tiền tệ (Ví dụ: 100k = 100000, 1tr = 1000000, 1.5tr = 1500000). Phân loại tiền của từng nhân viên vào 3 nhóm dựa trên tiêu đề khu vực hoặc loại dịch vụ:
-1. **"goi_mong" (Gội/Móng - Tỷ lệ 10%)**:
-   - MẶC ĐỊNH: Các dòng ghi doanh số nằm ở phần trên cùng / khu vực KHÔNG GHI GÌ ĐẶC BIỆT (hoặc không có tiêu đề %).
-   - Hoặc các dịch vụ: Gội đầu, làm móng (nail), cắt/uốn/nhuộm tóc, chà gót...
-2. **"mi" (Mi/Phun xăm - Tỷ lệ 30%)**:
-   - Khu vực nằm phía sau một khoảng cách/dòng trống có tiêu đề **"30%"** (hoặc "Mi", "Phun xăm"). Tất cả các dòng liệt kê trong khu vực 30% này sẽ được tính vào nhóm "mi".
-   - Hoặc các dịch vụ: Nối mi, uốn mi, xăm mày, phun môi...
-3. **"ngoai_gio" (Ngoài giờ/Tăng ca - Tỷ lệ 50%)**:
-   - Khu vực nằm phía sau một khoảng cách/dòng trống có tiêu đề **"50%"** (hoặc "Ngoài giờ", "Tăng ca", "Làm muộn"). Tất cả các dòng liệt kê trong khu vực 50% này sẽ được tính vào nhóm "ngoai_gio".
+### QUY TẮC QUY ĐỔI TIỀN TỆ NGHÌN ĐỒNG (THOUSANDS / K):
+1. BẮT BUỘC: Tất cả các con số đứng đơn lẻ trong trang sổ tay (Ví dụ: 50, 100, 140, 250, 260, 400) ĐỀU MẶC ĐỊNH LÀ ĐƠN VỊ NGHÌN ĐỒNG (k) và phải nhân với 1.000 để ra số tiền thực tế (ví dụ: 50 ➔ 50,000đ, 100 ➔ 100,000đ, 140 ➔ 140,000đ, 260 ➔ 260,000đ, 400 ➔ 400,000đ).
+2. Nếu có phép tính cộng dạng "200 + 150", tính tổng số tiền = 200,000đ + 150,000đ = 350,000đ (nếu 150 bị gạch xóa thì chỉ tính 200,000đ và cho 150,000đ vào deleted_items).
+
+### QUY TẮC CỘT DỌC SỔ TAY & KHU VỰC DỊCH VỤ:
+1. Sổ báo cáo được thiết kế theo CỘT DỌC từ trái sang phải. Tên nhân viên nằm ở tiêu đề trên cùng của cột (Ví dụ: "Hue" ➔ Huệ, "Cuc" ➔ chị Cúc, "QA" ➔ Quỳnh Anh, "Thảo"/"Thao" ➔ Thảo).
+2. TẤT CẢ các con số nằm bên dưới cột nào BẮT BUỘC phải cộng tổng doanh thu cho nhân viên đứng ở tiêu đề đầu cột đó!
+3. **Khu vực 10% (Gội/Móng - goi_mong)**: Các con số nằm ở bảng phía trên (dưới tên nhân viên).
+4. **Khu vực 30% (Mi/Xăm - mi)**: Các con số nằm phía dưới dòng tiêu đề "30%" (hoặc 30). Con số nằm ở cột nào thì tính vào nhóm mi (30%) của nhân viên ở cột đó. (Ví dụ: Trong dòng 30%, số 150 dưới cột QA ➔ tính 150k mi cho Quỳnh Anh).
+5. **Khu vực 50% (Ngoài giờ - ngoai_gio)**: Các con số nằm phía dưới dòng tiêu đề "50%" (hoặc 50).
 
 ### QUY TẮC PHÂN TÍCH CÁC DÒNG BỊ GẠCH XÓA / ĐIỀU CHỈNH (DELETED ITEMS):
 - Nếu phát hiện các dòng bị gạch ngang, gạch xóa, gạch đè:
