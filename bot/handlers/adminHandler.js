@@ -172,6 +172,26 @@ async function handleDeleteRagop(ctx) {
   return ctx.reply(`🗑️ **Đã xóa hợp đồng trả góp \`${insId}\` thành công!**`, { parse_mode: "Markdown" });
 }
 
+async function handleMau(ctx) {
+  let msg = `📝 **CÁC MẪU BÁO CÁO CHUẨN ĐỂ AI ĐỌC CHÍNH XÁC 100%**\n\n`;
+  msg += `📖 **1. CÁCH GHI SỔ TAY (Chụp ảnh gửi Bot):**\n`;
+  msg += `• **Kẻ cột đứng:** Viết tên thợ ở đầu cột (\`Huệ\`, \`Cúc\`, \`QA\` / \`Quỳnh Anh\`, \`Thảo\`, \`Nhi\`).\n`;
+  msg += `• **Gội/Móng (10%):** Viết số ở phần bảng trên cùng (\`50\`, \`100\`, \`250\` - AI tự nhân k).\n`;
+  msg += `• **Mi/Phun xăm (30%):** Viết tiêu đề \`30%\` rồi ghi con số dưới cột thợ tương ứng.\n`;
+  msg += `• **Ngoài giờ (50%):** Viết tiêu đề \`50%\` rồi ghi số tiền dưới cột thợ.\n\n`;
+
+  msg += `📱 **2. NHẮN TIN TRỰC TIẾP (Không cần chụp ảnh):**\n`;
+  msg += `\`Huệ gội 150k, mi 200k\`\n`;
+  msg += `\`QA 250k móng, 300k mi\`\n`;
+  msg += `\`Cúc gội móng 100k, nghỉ nửa ngày (làm 1/2)\`\n\n`;
+
+  msg += `💸 **3. CHI TIÊU & MUA TRẢ GÓP:**\n`;
+  msg += `\`Chi nước đá 20k, ship 30k\`\n`;
+  msg += `\`Mua máy mi 12tr trả góp 6 tháng\`\n`;
+
+  return ctx.reply(msg, { parse_mode: "Markdown" });
+}
+
 module.exports = {
   handleSetAdmin,
   handleStaff,
@@ -182,5 +202,6 @@ module.exports = {
   handleEditRevenue,
   handleEditExpense,
   handleDeleteReport,
-  handleDeleteRagop
+  handleDeleteRagop,
+  handleMau
 };

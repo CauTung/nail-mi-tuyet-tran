@@ -40,6 +40,7 @@ function createBotApp() {
   bot.command("tragop", queryHandler.handleTragop);
   bot.command("myid", queryHandler.handleMyId);
   bot.command("addpast", queryHandler.handleAddPast);
+  bot.command(["mau", "template"], adminHandler.handleMau);
 
   // Registration for Admin
   bot.command("setadmin", adminHandler.handleSetAdmin);
