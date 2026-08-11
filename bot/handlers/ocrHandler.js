@@ -121,6 +121,17 @@ async function processMediaBatch(mediaGroupId, statusMsg, batchData) {
       inputType: `photo_album (${imageBuffers.length} ảnh)`
     });
 
+    // Tự động lưu nhân viên mới vào DB nếu AI phát hiện tên mới
+    if (Array.isArray(result.staff_data)) {
+      for (const s of result.staff_data) {
+        const staffName = (s.name || s.staff_name || s.ten_nhan_vien || "").trim();
+        if (staffName && s.is_unknown_staff) {
+          await staffRepo.addStaff(staffName);
+          console.log(`✨ [TỰ ĐỘNG LƯU NHÂN VIÊN MỚI] Đã ghi nhận nhân viên mới: "${staffName}"`);
+        }
+      }
+    }
+
     const replyMsg = formatReportResponse(result, saved.record.id, saved.dateStr);
     await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
     await ctx.reply(replyMsg, { parse_mode: "Markdown" });
@@ -248,6 +259,17 @@ async function handleOcrMessage(ctx, next) {
       userInfo,
       inputType: photo ? "photo" : "text"
     });
+
+    // Tự động lưu nhân viên mới vào DB nếu AI phát hiện tên mới
+    if (Array.isArray(result.staff_data)) {
+      for (const s of result.staff_data) {
+        const staffName = (s.name || s.staff_name || s.ten_nhan_vien || "").trim();
+        if (staffName && s.is_unknown_staff) {
+          await staffRepo.addStaff(staffName);
+          console.log(`✨ [TỰ ĐỘNG LƯU NHÂN VIÊN MỚI] Đã ghi nhận nhân viên mới: "${staffName}"`);
+        }
+      }
+    }
 
     const replyMsg = formatReportResponse(result, saved.record.id, saved.dateStr);
     await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);

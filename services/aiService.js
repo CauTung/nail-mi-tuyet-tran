@@ -16,6 +16,8 @@ Nhiệm vụ của bạn là phân tích hình ảnh (bảng viết tay, ảnh c
    - "Cúc", "cúc", "chị Cúc", "Cúc chị" ➔ quy về "chị Cúc"
    - "Tuyết", "bà chủ", "Tuyết Trần", "chị Tuyết" ➔ quy về "bà chủ Tuyết Trần"
    - "Huệ", "hue" ➔ quy về "Huệ"
+   - "Thảo", "Công chúa", "thảo", "thao", "thảo công chúa" ➔ quy về "Thảo (Công chúa)"
+   - "Nhi", "nhi" ➔ quy về "Nhi"
 2. So sánh tên đọc được với [${staffString}]. Tự động sửa các lỗi chính tả nhỏ nếu độ tương đồng > 80%. Nếu xuất hiện tên lạ chưa có trong danh sách, đặt "is_unknown_staff": true.
 3. Trong "staff_data", thuộc tính "name" là BẮT BUỘC (chứa tên nhân viên chuẩn). KHÔNG ĐƯỢC ĐỂ TRỐNG Hoặc ĐỔI THÀNH TÊN KHÁC.
 

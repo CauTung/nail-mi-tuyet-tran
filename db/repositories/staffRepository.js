@@ -4,7 +4,7 @@ const { supabase, isSupabaseConnected } = require("../../config/supabase");
 
 const DATA_DIR = path.join(__dirname, "../../data");
 const STAFF_FILE = path.join(DATA_DIR, "staff.json");
-const DEFAULT_STAFF = ["bà chủ Tuyết Trần", "Quỳnh Anh", "Huệ", "chị Cúc"];
+const DEFAULT_STAFF = ["bà chủ Tuyết Trần", "Quỳnh Anh", "Huệ", "chị Cúc", "Thảo (Công chúa)", "Nhi"];
 
 function ensureLocalFile() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
