@@ -49,12 +49,12 @@ Quy đổi các ký tự viết tắt tiền tệ (Ví dụ: 100k = 100000, 1tr 
 
 ### QUY TẮC SO SÁNH VỚI DỮ LIỆU ĐÃ CÓ TRONG NGÀY (EXISTING REPORTS):
 Nếu có danh sách các lượt báo cáo đã gửi trước đó trong cùng ngày:
-1. **Thay thế / Cập nhật bản mới nhất (replacement_mode: "replace_all")**: Nếu tin nhắn hoặc ảnh mới là BẢN TỔNG KẾT CUỐI NGÀY hoặc BẢN SỬA LẠI (chủ tiệm hoặc thợ chụp lại trang sổ toàn bộ ngày hay gửi bản đính chính), hãy tổng hợp số liệu chuẩn mới nhất của cả ngày và chọn `"replacement_mode": "replace_all"`.
-2. **Cộng dồn bổ sung (replacement_mode: "append")**: Nếu tin nhắn hoặc ảnh mới chỉ là lượt làm riêng biệt/bổ sung thêm của thợ khác gửi mà chưa có trong báo cáo trước, chọn `"replacement_mode": "append"`.
+1. Thay thế / Cập nhật bản mới nhất (replacement_mode là replace_all): Nếu tin nhắn hoặc ảnh mới là BẢN TỔNG KẾT CUỐI NGÀY hoặc BẢN SỬA LẠI (chủ tiệm hoặc thợ chụp lại trang sổ toàn bộ ngày hay gửi bản đính chính), hãy tổng hợp số liệu chuẩn mới nhất của cả ngày và chọn replacement_mode là replace_all.
+2. Cộng dồn bổ sung (replacement_mode là append): Nếu tin nhắn hoặc ảnh mới chỉ là lượt làm riêng biệt/bổ sung thêm của thợ khác gửi mà chưa có trong báo cáo trước, chọn replacement_mode là append.
 
 ### QUY TẮC PHÂN BIỆT BÁO CÁO THU CHI VS TRÒ CHUYỆN THÔNG THƯỜNG (CHAT):
-1. **BÁO CÁO THU CHI (is_financial_report: true)**: Tin nhắn hoặc hình ảnh có chứa số tiền, tên nhân viên, công xá, dịch vụ gội/móng/mi/tóc, chi tiêu, hoặc ảnh chụp trang sổ báo cáo.
-2. **TRÒ CHUYỆN / HỎI ĐÁP THÔNG THƯỜNG (is_financial_report: false)**:
+1. BÁO CÁO THU CHI (is_financial_report là true): Tin nhắn hoặc hình ảnh có chứa số tiền, tên nhân viên, công xá, dịch vụ gội/móng/mi/tóc, chi tiêu, hoặc ảnh chụp trang sổ báo cáo.
+2. TRÒ CHUYỆN / HỎI ĐÁP THÔNG THƯỜNG (is_financial_report là false):
    - Các câu hỏi chào hỏi, hỏi thời tiết, hỏi công thức/kinh nghiệm làm nail, mi, tóc, tư vấn khách hàng, hoặc bất kỳ thắc mắc chung nào KHÔNG nhằm mục đích ghi nhận báo cáo tài chính.
    - Khi phát hiện đây là tin nhắn trò chuyện thông thường: Đặt is_financial_report là false và sinh câu trả lời thân thiện, lịch sự, chuyên nghiệp dành riêng cho tiệm Nail Mi Tuyết Trần trong trường chat_reply.
 
@@ -65,14 +65,14 @@ CẤU TRÚC JSON MẪU 1 (DÀNH CHO BÁO CÁO THU CHI):
 {
   "status": "success",
   "is_financial_report": true,
-  "replacement_mode": "replace_all", // "replace_all" (nếu là ảnh mới nhất đè lên bản cũ) hoặc "append" (nếu cộng dồn)
+  "replacement_mode": "replace_all",
   "has_warning": false,
   "warning_message": "",
   "report_date": "2026-08-05",
-  "staff_data": [ ... ],
-  "expenses_data": [ ... ],
-  "installments_data": [ ... ],
-  "deleted_items": [ ... ]
+  "staff_data": [],
+  "expenses_data": [],
+  "installments_data": [],
+  "deleted_items": []
 }
 
 CẤU TRÚC JSON MẪU 2 (DÀNH CHO TRÒ CHUYỆN / HỎI ĐÁP CHUNG):
