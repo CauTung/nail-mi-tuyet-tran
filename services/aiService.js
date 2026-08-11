@@ -85,11 +85,7 @@ CẤU TRÚC JSON MẪU 2 (DÀNH CHO TRÒ CHUYỆN / HỎI ĐÁP CHUNG):
 
 const fetch = require("node-fetch");
 
-let cachedWorkingModel = null;
-
-async function getWorkingModel(apiKey) {
-  if (cachedWorkingModel) return cachedWorkingModel;
-
+async function getWorkingModels(apiKey) {
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
     if (res.ok) {
@@ -99,27 +95,23 @@ async function getWorkingModel(apiKey) {
           .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
           .map(m => m.name.replace("models/", ""));
 
-        console.log("🤖 [AI DYNAMIC DISCOVERY] Danh sách model Google hỗ trợ cho API Key của bạn:", supported);
+        console.log("🤖 [AI DYNAMIC DISCOVERY] Danh sách model Google hoạt động 100%:", supported);
 
-        // Ưu tiên chọn model flash 2.0 -> flash 1.5 -> pro
-        const chosen = supported.find(m => m.includes("2.0") && m.includes("flash"))
-                    || supported.find(m => m.includes("1.5") && m.includes("flash"))
-                    || supported.find(m => m.includes("flash"))
-                    || supported.find(m => m.includes("pro"))
-                    || supported[0];
+        // Sắp xếp ưu tiên các model flash trước
+        const sorted = supported.sort((a, b) => {
+          if (a.includes("flash") && !b.includes("flash")) return -1;
+          if (!a.includes("flash") && b.includes("flash")) return 1;
+          return 0;
+        });
 
-        if (chosen) {
-          cachedWorkingModel = chosen;
-          console.log(`🎯 [AI DYNAMIC DISCOVERY] Đã tự động chọn model chuẩn nhất: ${chosen}`);
-          return chosen;
-        }
+        if (sorted.length > 0) return sorted;
       }
     }
   } catch (e) {
     console.warn("⚠️ Không thể quét danh sách model từ Google API:", e.message);
   }
 
-  return "gemini-1.5-flash";
+  return ["gemini-2.0-flash"];
 }
 
 async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeType = "image/jpeg", customStaffList, existingReports }) {
@@ -130,9 +122,8 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
 
   const genAI = new GoogleGenerativeAI(apiKey);
   
-  // Tự động tìm model chính xác 100% đang hoạt động cho API Key
-  const workingModelName = await getWorkingModel(apiKey);
-  const candidateModels = Array.from(new Set([workingModelName, "gemini-1.5-flash", "gemini-1.5-pro"]));
+  // Tự động sử dụng danh sách model thực tế do Google cấp cho API Key của bạn
+  const candidateModels = await getWorkingModels(apiKey);
 
   let responseText = null;
   let lastError = null;
