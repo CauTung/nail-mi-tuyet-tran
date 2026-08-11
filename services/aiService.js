@@ -42,13 +42,13 @@ Nhiệm vụ của bạn là phân tích hình ảnh (bảng viết tay, ảnh c
 4. **Khu vực 30% (Mi/Xăm - mi)**: Các con số nằm phía dưới dòng tiêu đề "30%" (hoặc 30). Con số nằm ở cột nào thì tính vào nhóm mi (30%) của nhân viên ở cột đó. (Ví dụ: Trong dòng 30%, số 150 dưới cột QA ➔ tính 150k mi cho Quỳnh Anh).
 5. **Khu vực 50% (Ngoài giờ - ngoai_gio)**: Các con số nằm phía dưới dòng tiêu đề "50%" (hoặc 50).
 
-### QUY TẮC PHÂN TÍCH CÁC DÒNG BỊ GẠCH XÓA / ĐIỀU CHỈNH (DELETED ITEMS):
-- Nếu phát hiện các dòng bị gạch ngang, gạch xóa, gạch đè:
-  1. KHÔNG tính tiền từ các dòng này vào doanh thu hay chi tiêu chính.
-  2. Bắt buộc trích xuất danh sách các dòng bị xóa này vào mảng "deleted_items" bao gồm:
-     - "content": Nội dung ban đầu của dòng bị gạch xóa (ví dụ: "Huệ gội móng 200k").
-     - "original_amount": Số tiền ghi trong dòng đó nếu có (số nguyên, ví dụ: 200000).
-     - "reason": Lý do xóa nếu ghi bên cạnh (ví dụ: "Khách hủy", "Ghi nhầm", "Chủ xóa", hoặc "Không có lý do").
+### QUY TẮC PHÂN TÍCH CÁC DÒNG SỬA SỐ & GẠCH XÓA (CORRECTIONS VS DELETIONS):
+1. **VIẾT ĐÈ / SỬA SỐ (Overwritten/Corrected values)**:
+   - Nếu một con số bị viết đè lên để sửa lại giá trị (Ví dụ: ban đầu viết 60 rồi sửa đè lên thành 50, hoặc sửa 100 thành 80): **BẮT BUỘC LẤY CON SỐ SAU KHI SỬA (Ví dụ: 50 ➔ 50,000đ)** để cộng vào doanh thu! KHÔNG ĐƯỢC BỎ QUA HAY XÓA NHẦM.
+2. **GẠCH XÓA TOÀN BỘ DÒNG / HỦY LƯỢT (Full Strikethrough)**:
+   - Chỉ khi một con số hoặc cả dòng bị gạch gạch gạch đè ngang xóa hẳn toàn bộ (thể hiện hủy lượt làm/gạch bỏ hoàn toàn):
+     - KHÔNG tính tiền từ các dòng này vào doanh thu.
+     - Trích xuất vào mảng "deleted_items" với lý do cụ thể.
 
 ### QUY TẮC PHÂN TÍCH CÁC KHOẢN CHI TIÊU & TRẢ GÓP (EXPENSES & INSTALLMENTS):
 1. Chi tiêu trong ngày (EXPENSES): Nước đá, tiền ship, đồ ăn, trả tiền điện, hóa chất... Trích xuất "amount" (số nguyên) và "notes".
