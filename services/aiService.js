@@ -90,13 +90,19 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  // Chọn các mô hình siêu tốc độ chuyên Vision OCR
-  const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
+  // Chọn các mô hình siêu tốc độ chuẩn của Google AI Studio
+  const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash-latest"];
   let responseText = null;
   let lastError = null;
 
-  // Hàm bọc Timeout tránh treo request quá lâu
-  const withTimeout = (promise, ms = 15000) => {
+  const buffers = Array.isArray(imageBuffers) && imageBuffers.length > 0 
+    ? imageBuffers 
+    : (imageBuffer ? [imageBuffer] : []);
+
+  // Tự động tăng thời gian chờ nếu gửi album nhiều ảnh (30s cho album, 20s cho đơn ảnh)
+  const timeoutMs = buffers.length > 1 ? 30000 : 20000;
+
+  const withTimeout = (promise, ms = timeoutMs) => {
     return Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error("Hết thời gian phản hồi (Timeout)")), ms))
@@ -123,10 +129,6 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
         contents.push(`Dữ liệu báo cáo dạng văn bản:\n"""${textInput}"""`);
       }
 
-      const buffers = Array.isArray(imageBuffers) && imageBuffers.length > 0 
-        ? imageBuffers 
-        : (imageBuffer ? [imageBuffer] : []);
-
       if (buffers.length > 0) {
         buffers.forEach((buf, idx) => {
           contents.push({
@@ -142,11 +144,11 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
         contents.push(`Hãy phân tích và tổng hợp toàn bộ ${buffers.length} trang ảnh báo cáo trên theo đúng quy tắc.`);
       }
 
-      const result = await withTimeout(model.generateContent(contents), 15000);
+      const result = await withTimeout(model.generateContent(contents), timeoutMs);
       responseText = result.response.text().trim();
       if (responseText) break;
     } catch (err) {
-      console.warn(`⚠️ Model ${modelName} gặp sự cố hoặc timeout, thử model tiếp theo...`);
+      console.warn(`⚠️ Model ${modelName} gặp sự cố hoặc timeout: ${err.message}, thử model tiếp theo...`);
       lastError = err;
     }
   }
