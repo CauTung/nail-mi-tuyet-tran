@@ -1,4 +1,5 @@
 const http = require("http");
+const fetch = require("node-fetch");
 const { createBotApp } = require("./bot/botApp");
 const env = require("./config/env");
 
@@ -15,6 +16,17 @@ async function start() {
   }).listen(port, () => {
     console.log(`🌐 [HTTP HEALTH-CHECK] Đã mở cổng PORT ${port} cho Render.com kiểm tra Web Service.`);
   });
+
+  // Tự động Ping URL định kỳ 8 phút/lần chống Render ngủ ngật (Spin Down)
+  const appUrl = process.env.RENDER_EXTERNAL_URL || "https://nail-mi-tuyet-tran.onrender.com";
+  setInterval(async () => {
+    try {
+      await fetch(appUrl);
+      console.log(`📡 [KEEP-ALIVE PING] Đã tự động ping ${appUrl} giữ bot luôn thức 24/7!`);
+    } catch (e) {
+      console.warn("⚠️ Keep-alive ping error:", e.message);
+    }
+  }, 8 * 60 * 1000);
 
   try {
     const bot = createBotApp();
