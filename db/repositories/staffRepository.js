@@ -19,6 +19,11 @@ async function getStaffList() {
       const { data, error } = await supabase.from("staff").select("name").eq("is_active", true);
       if (!error && data && data.length > 0) {
         return data.map(item => item.name);
+      } else if (!error && (!data || data.length === 0)) {
+        // Tự động mồi danh sách nhân viên mặc định nếu DB trên Supabase chưa có dữ liệu
+        const defaultRows = DEFAULT_STAFF.map(name => ({ name, is_active: true }));
+        await supabase.from("staff").upsert(defaultRows, { onConflict: "name" });
+        return DEFAULT_STAFF;
       }
     } catch (err) {
       console.error("Lỗi lấy danh sách nhân viên từ Supabase:", err);

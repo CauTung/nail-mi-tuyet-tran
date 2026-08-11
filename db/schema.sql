@@ -9,6 +9,15 @@ CREATE TABLE IF NOT EXISTS staff (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Seed mồi mặc định danh sách nhân viên của tiệm
+INSERT INTO staff (name, is_active)
+VALUES
+    ('bà chủ Tuyết Trần', TRUE),
+    ('Quỳnh Anh', TRUE),
+    ('Huệ', TRUE),
+    ('chị Cúc', TRUE)
+ON CONFLICT (name) DO NOTHING;
+
 -- 2. Table: admins (Danh sách Telegram User ID của Admin)
 CREATE TABLE IF NOT EXISTS admins (
     id SERIAL PRIMARY KEY,
