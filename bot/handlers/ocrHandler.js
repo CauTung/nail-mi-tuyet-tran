@@ -97,8 +97,10 @@ async function handleOcrMessage(ctx, next) {
     const existingReports = await reportRepo.getDailyReports(todayStr);
 
     if (photo && photo.length > 0) {
-      const highestResPhoto = photo[photo.length - 1];
-      const fileUrl = await ctx.telegram.getFileLink(highestResPhoto.file_id);
+      // Chọn kích thước ảnh tối ưu (Large ~800-1280px) để vừa đọc rõ chữ vừa tải siêu nhanh
+      const photoSizeIndex = Math.min(2, photo.length - 1);
+      const targetPhoto = photo[photoSizeIndex];
+      const fileUrl = await ctx.telegram.getFileLink(targetPhoto.file_id);
       const res = await fetch(fileUrl.href);
       imageBuffer = await res.buffer();
 

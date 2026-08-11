@@ -90,9 +90,18 @@ async function extractDailyReport({ textInput, imageBuffer, mimeType = "image/jp
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const candidateModels = ["gemini-2.0-flash", "gemini-flash-latest", "gemini-2.5-flash", "gemini-3.5-flash"];
+  // Chọn các mô hình siêu tốc độ chuyên Vision OCR
+  const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash"];
   let responseText = null;
   let lastError = null;
+
+  // Hàm bọc Timeout tránh treo request quá lâu
+  const withTimeout = (promise, ms = 12000) => {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Hết thời gian phản hồi (Timeout)")), ms))
+    ]);
+  };
 
   for (const modelName of candidateModels) {
     try {
@@ -124,10 +133,11 @@ async function extractDailyReport({ textInput, imageBuffer, mimeType = "image/jp
         contents.push("Hãy phân tích hình ảnh báo cáo viết tay/chụp màn hình trên theo đúng quy tắc.");
       }
 
-      const result = await model.generateContent(contents);
+      const result = await withTimeout(model.generateContent(contents), 15000);
       responseText = result.response.text().trim();
       if (responseText) break;
     } catch (err) {
+      console.warn(`⚠️ Model ${modelName} gặp sự cố hoặc timeout, thử model tiếp theo...`);
       lastError = err;
     }
   }
