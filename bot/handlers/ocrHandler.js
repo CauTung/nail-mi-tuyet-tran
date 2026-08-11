@@ -121,9 +121,15 @@ async function handleOcrMessage(ctx, next) {
 
     if (!result || result.status !== "success") {
       await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-      return ctx.reply("❌ **Không thể phân tích dữ liệu.** Vui lòng chụp rõ hơn hoặc gửi lại tin nhắn!", {
+      return ctx.reply("❌ **Không thể phân tích dữ liệu.** Vui lòng gửi lại tin nhắn hoặc ảnh rõ hơn!", {
         parse_mode: "Markdown"
       });
+    }
+
+    // Nếu đây là tin nhắn hỏi đáp / trò chuyện thông thường (không phải báo cáo tài chính)
+    if (result.is_financial_report === false && result.chat_reply) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
+      return ctx.reply(result.chat_reply, { parse_mode: "Markdown" });
     }
 
     const saved = await reportRepo.saveReport(result, {

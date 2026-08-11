@@ -47,50 +47,33 @@ Quy đổi các ký tự viết tắt tiền tệ (Ví dụ: 100k = 100000, 1tr 
    - "months": Số tháng trả góp (số nguyên, ví dụ: 6).
    - "monthly_amount": Số tiền tự chia trung bình mỗi tháng = Math.round(total_amount / months).
 
+### QUY TẮC PHÂN BIỆT BÁO CÁO THU CHI VS TRÒ CHUYỆN THÔNG THƯỜNG (CHAT):
+1. **BÁO CÁO THU CHI (is_financial_report: true)**: Tin nhắn hoặc hình ảnh có chứa số tiền, tên nhân viên, công xá, dịch vụ gội/móng/mi/tóc, chi tiêu, hoặc ảnh chụp trang sổ báo cáo.
+2. **TRÒ CHUYỆN / HỎI ĐÁP THÔNG THƯỜNG (is_financial_report: false)**:
+   - Các câu hỏi chào hỏi, hỏi thời tiết, hỏi công thức/kinh nghiệm làm nail, mi, tóc, tư vấn khách hàng, hoặc bất kỳ thắc mắc chung nào KHÔNG nhằm mục đích ghi nhận báo cáo tài chính.
+   - Khi phát hiện đây là tin nhắn trò chuyện thông thường: Đặt is_financial_report là false và sinh câu trả lời thân thiện, lịch sự, chuyên nghiệp dành riêng cho tiệm Nail Mi Tuyết Trần trong trường chat_reply.
+
 ### YÊU CẦU ĐỊNH DẠNG ĐẦU RA:
 - BẮT BUỘC CHỈ TRẢ VỀ DUY NHẤT ĐỊNH DẠNG JSON KHÔNG KÈM LỜI GIẢI THÍCH, KHÔNG CHỨA MARKDOWN CODEBLOCK ĐẦU CUỐI KHI TRẢ VỀ RAW JSON.
 
-CẤU TRÚC JSON MẪU BẮT BUỘC TRẢ VỀ:
+CẤU TRÚC JSON MẪU 1 (DÀNH CHO BÁO CÁO THU CHI):
 {
   "status": "success",
+  "is_financial_report": true,
   "has_warning": false,
   "warning_message": "",
-  "report_date": "2026-08-05", // BẮT BUỘC: Nếu trên trang sổ viết tay/hình ảnh hoặc caption có ghi ngày (Ví dụ: "Ngày 05/08", "05/08/2026", "2026-08-05"), hãy trích xuất chính xác theo định dạng YYYY-MM-DD. NĂM MẶC ĐỊNH LUÔN LÀ NĂM HIỆN TẠI (2026). TUYỆT ĐỐI KHÔNG ĐOÁN LÀ NĂM 2024 NẾU KHÔNG CÓ GHI NĂM. Nếu hoàn toàn không thấy ngày thì để null.
-  "staff_data": [
-    {
-      "name": "Hoa",
-      "is_unknown_staff": false,
-      "attendance_description": "Nghỉ 1/4 ngày (Làm 3/4 ngày)",
-      "attendance_score": 0.75,
-      "revenue": {
-        "goi_mong": 200000,
-        "mi": 500000,
-        "ngoai_gio": 0
-      }
-    }
-  ],
-  "expenses_data": [
-    {
-      "category": "Chi phí vận hành",
-      "amount": 50000,
-      "notes": "Mua nước đá"
-    }
-  ],
-  "installments_data": [
-    {
-      "item_name": "Máy uốn tóc",
-      "total_amount": 10300000,
-      "months": 6,
-      "monthly_amount": 1716667
-    }
-  ],
-  "deleted_items": [
-    {
-      "content": "Quỳnh Anh uốn mi 250k",
-      "original_amount": 250000,
-      "reason": "Khách đổi lịch"
-    }
-  ]
+  "report_date": "2026-08-05",
+  "staff_data": [ ... ],
+  "expenses_data": [ ... ],
+  "installments_data": [ ... ],
+  "deleted_items": [ ... ]
+}
+
+CẤU TRÚC JSON MẪU 2 (DÀNH CHO TRÒ CHUYỆN / HỎI ĐÁP CHUNG):
+{
+  "status": "success",
+  "is_financial_report": false,
+  "chat_reply": "Chào bạn! Tôi có thể giúp gì cho tiệm Nail Mi Tuyết Trần hôm nay?"
 }`;
 }
 
