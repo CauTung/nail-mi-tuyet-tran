@@ -90,8 +90,8 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  // Chọn các mô hình siêu tốc độ chuẩn của Google AI Studio
-  const candidateModels = ["gemini-2.0-flash", "gemini-1.5-flash-latest"];
+  // Các mô hình hợp lệ 100% trên API Google Generative AI v1beta
+  const candidateModels = ["gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-flash-8b"];
   let responseText = null;
   let lastError = null;
 
@@ -99,13 +99,13 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
     ? imageBuffers 
     : (imageBuffer ? [imageBuffer] : []);
 
-  // Tự động tăng thời gian chờ nếu gửi album nhiều ảnh (30s cho album, 20s cho đơn ảnh)
-  const timeoutMs = buffers.length > 1 ? 30000 : 20000;
+  // Tự động tăng thời gian chờ nếu gửi album nhiều ảnh (45s cho album, 25s cho đơn ảnh)
+  const timeoutMs = buffers.length > 1 ? 45000 : 25000;
 
   const withTimeout = (promise, ms = timeoutMs) => {
     return Promise.race([
       promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Hết thời gian phản hồi (Timeout)")), ms))
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`Hết thời gian phản hồi (${ms / 1000}s Timeout)`)), ms))
     ]);
   };
 

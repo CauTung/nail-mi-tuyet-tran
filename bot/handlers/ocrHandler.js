@@ -81,15 +81,15 @@ async function processMediaBatch(mediaGroupId) {
   const { ctx, photosData, textMsg, userInfo, statusMsg } = batchData;
 
   try {
-    const imageBuffers = [];
-    for (const p of photosData) {
-      const photoSizeIndex = Math.min(2, p.length - 1);
-      const targetPhoto = p[photoSizeIndex];
-      const fileUrl = await ctx.telegram.getFileLink(targetPhoto.file_id);
-      const res = await fetch(fileUrl.href);
-      const buf = await res.buffer();
-      imageBuffers.push(buf);
-    }
+    const imageBuffers = await Promise.all(
+      photosData.map(async (p) => {
+        const photoSizeIndex = Math.min(2, p.length - 1);
+        const targetPhoto = p[photoSizeIndex];
+        const fileUrl = await ctx.telegram.getFileLink(targetPhoto.file_id);
+        const res = await fetch(fileUrl.href);
+        return await res.buffer();
+      })
+    );
 
     const todayStr = new Date().toISOString().substring(0, 10);
     const existingReports = await reportRepo.getDailyReports(todayStr);
