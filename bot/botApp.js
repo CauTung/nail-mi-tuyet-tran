@@ -4,6 +4,7 @@ const { adminOnlyMiddleware } = require("./middlewares/authMiddleware");
 const ocrHandler = require("./handlers/ocrHandler");
 const queryHandler = require("./handlers/queryHandler");
 const adminHandler = require("./handlers/adminHandler");
+const reminderService = require("../services/reminderService");
 
 function createBotApp() {
   if (!env.telegramToken) {
@@ -11,6 +12,9 @@ function createBotApp() {
   }
 
   const bot = new Telegraf(env.telegramToken);
+
+  // Kích hoạt lịch nhắc nhở 20:00 hàng ngày
+  reminderService.initDailyReminder(bot);
 
   // Command: /start & /help
   bot.start(ctx => {
