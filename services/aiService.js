@@ -79,11 +79,29 @@ CẤU TRÚC JSON MẪU 1 (DÀNH CHO BÁO CÁO THU CHI):
   "replacement_mode": "replace_all",
   "has_warning": false,
   "warning_message": "",
-  "report_date": "2026-08-05",
-  "staff_data": [],
+  "report_date": "2026-08-10",
+  "staff_data": [
+    {
+      "name": "Quỳnh Anh",
+      "attendance_score": 1.0,
+      "attendance_description": "Làm cả ngày",
+      "is_unknown_staff": false,
+      "revenue": {
+        "goi_mong": 1490000,
+        "mi": 350000,
+        "ngoai_gio": 0
+      }
+    }
+  ],
   "expenses_data": [],
   "installments_data": [],
-  "deleted_items": []
+  "deleted_items": [
+    {
+      "content": "Số 150 bị gạch xóa trong phép tính 200 + 150 tại khu vực 30%",
+      "original_amount": 150000,
+      "reason": "Nét mực gạch ngang"
+    }
+  ]
 }
 
 CẤU TRÚC JSON MẪU 2 (DÀNH CHO TRÒ CHUYỆN / HỎI ĐÁP CHUNG):
@@ -166,15 +184,16 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
 
   for (const modelName of candidateModels) {
     try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: { responseMimeType: "application/json" }
-      });
-
       const activeStaffList = customStaffList || (await staffRepo.getStaffList());
       const systemPrompt = getSystemPrompt(activeStaffList);
 
-      const contents = [systemPrompt];
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        systemInstruction: systemPrompt,
+        generationConfig: { responseMimeType: "application/json" }
+      });
+
+      const contents = [];
 
       if (existingReports && existingReports.length > 0) {
         contents.push(`DANH SÁCH BÁO CÁO ĐÃ GHI NHẬN TRƯỚC ĐÓ TRONG NGÀY HÔM NAY:\n${JSON.stringify(existingReports, null, 2)}`);
@@ -196,7 +215,7 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
             contents.push(`[Trang ảnh số ${idx + 1}/${buffers.length}]`);
           }
         });
-        contents.push(`Hãy phân tích và tổng hợp toàn bộ ${buffers.length} trang ảnh báo cáo trên theo đúng quy tắc.`);
+        contents.push(`Hãy phân tích và tổng hợp toàn bộ ${buffers.length} trang ảnh báo cáo trên theo đúng quy tắc systemInstruction.`);
       }
 
       const result = await withTimeout(model.generateContent(contents), timeoutMs);

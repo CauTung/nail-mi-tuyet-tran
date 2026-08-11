@@ -15,9 +15,9 @@ function formatReportResponse(reportData, reportId, targetDateStr) {
   if (Array.isArray(reportData.staff_data) && reportData.staff_data.length > 0) {
     msg += `👩‍🎨 **CHI TIẾT DOANH SỐ NHÂN VIÊN:**\n`;
     reportData.staff_data.forEach(s => {
-      const gm = s.revenue?.goi_mong || 0;
-      const mi = s.revenue?.mi || 0;
-      const ng = s.revenue?.ngoai_gio || 0;
+      const gm = (typeof s.revenue === "object" ? s.revenue?.goi_mong : 0) || s.goi_mong || s.goi || 0;
+      const mi = (typeof s.revenue === "object" ? s.revenue?.mi : 0) || s.mi || s.xam || 0;
+      const ng = (typeof s.revenue === "object" ? s.revenue?.ngoai_gio : 0) || s.ngoai_gio || s.tang_ca || 0;
       const total = gm + mi + ng;
       grandTotal += total;
 
@@ -54,7 +54,8 @@ function formatReportResponse(reportData, reportId, targetDateStr) {
   if (Array.isArray(reportData.deleted_items) && reportData.deleted_items.length > 0) {
     msg += `🗑️ **DÒNG BỊ GẠCH XÓA / BỎ QUA:**\n`;
     reportData.deleted_items.forEach(del => {
-      msg += `• ~"${del.content}"~ (Lý do: ${del.reason})\n`;
+      const delContent = del.content || del.item || del.notes || (del.original_amount ? formatMoney(del.original_amount) : "Dòng bị gạch xóa");
+      msg += `• ~"${delContent}"~ (Lý do: ${del.reason || "Số bị gạch xóa"})\n`;
     });
     msg += `\n`;
   }
