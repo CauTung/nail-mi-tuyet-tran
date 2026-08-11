@@ -1,0 +1,186 @@
+const staffRepo = require("../../db/repositories/staffRepository");
+const configRepo = require("../../db/repositories/configRepository");
+const reportRepo = require("../../db/repositories/reportRepository");
+const installmentRepo = require("../../db/repositories/installmentRepository");
+const adminRepo = require("../../db/repositories/adminRepository");
+
+async function handleSetAdmin(ctx) {
+  const userId = ctx.from.id;
+  const currentAdmins = await adminRepo.getAdminList();
+
+  if (currentAdmins.length === 0) {
+    await adminRepo.addAdminUser(userId);
+    return ctx.reply(`🎉 **Chúc mừng!** Bạn (ID: \`${userId}\`) đã trở thành Admin đầu tiên của tiệm!`, { parse_mode: "Markdown" });
+  }
+
+  const isAdmin = await adminRepo.isAdminUser(userId);
+  if (isAdmin) {
+    return ctx.reply(`👑 Bạn đã là Admin của hệ thống rồi (ID: \`${userId}\`).`, { parse_mode: "Markdown" });
+  }
+
+  return ctx.reply("❌ Hệ thống đã có Admin. Bạn cần xin phép Admin hiện tại cấp quyền!", { parse_mode: "Markdown" });
+}
+
+async function handleStaff(ctx) {
+  const staffList = await staffRepo.getStaffList();
+  let msg = `👩‍🎨 **DANH SÁCH NHÂN VIÊN CHUẨN HIỆN TẠI:**\n\n`;
+  staffList.forEach((name, i) => {
+    msg += `${i + 1}. **${name}**\n`;
+  });
+  return ctx.reply(msg, { parse_mode: "Markdown" });
+}
+
+async function handleAddStaff(ctx) {
+  const text = ctx.message.text.trim();
+  const parts = text.split(" ").slice(1);
+  const rawNames = parts.join(" ");
+
+  if (!rawNames) {
+    return ctx.reply("⚠️ Cú pháp: `/addstaff Tên1, Tên2` (Ví dụ: `/addstaff Hoa, Trang`)", { parse_mode: "Markdown" });
+  }
+
+  const newNames = rawNames.split(",").map(s => s.trim()).filter(Boolean);
+  const updated = await staffRepo.addStaff(newNames);
+
+  return ctx.reply(`✅ **Đã thêm nhân viên mới thành công!**\nDanh sách hiện tại: ${updated.map(n => `\`${n}\``).join(", ")}`, { parse_mode: "Markdown" });
+}
+
+async function handleRemoveStaff(ctx) {
+  const text = ctx.message.text.trim();
+  const name = text.split(" ").slice(1).join(" ").trim();
+
+  if (!name) {
+    return ctx.reply("⚠️ Cú pháp: `/removestaff Tên_Nhân_Viên`", { parse_mode: "Markdown" });
+  }
+
+  const updated = await staffRepo.removeStaff(name);
+  return ctx.reply(`✅ **Đã xóa nhân viên "${name}" khỏi danh sách đối chiếu.**\nDanh sách hiện tại: ${updated.map(n => `\`${n}\``).join(", ")}`, { parse_mode: "Markdown" });
+}
+
+async function handleSetStaff(ctx) {
+  const text = ctx.message.text.trim();
+  const rawNames = text.split(" ").slice(1).join(" ");
+
+  if (!rawNames) {
+    return ctx.reply("⚠️ Cú pháp: `/setstaff Tên1, Tên2, Tên3`", { parse_mode: "Markdown" });
+  }
+
+  const newNames = rawNames.split(",").map(s => s.trim()).filter(Boolean);
+  const updated = await staffRepo.saveStaffList(newNames);
+
+  return ctx.reply(`✅ **Đã cập nhật toàn bộ danh sách nhân viên chuẩn!**\nDanh sách: ${updated.map(n => `\`${n}\``).join(", ")}`, { parse_mode: "Markdown" });
+}
+
+async function handleSetCommission(ctx) {
+  const parts = ctx.message.text.trim().split(" ");
+  if (parts.length < 4) {
+    return ctx.reply("⚠️ Cú pháp: `/setcommission <goimong%> <mi%> <ngoaigio%>` (Ví dụ: `/setcommission 10 30 50`)", { parse_mode: "Markdown" });
+  }
+
+  const gm = parseInt(parts[1], 10);
+  const mi = parseInt(parts[2], 10);
+  const ng = parseInt(parts[3], 10);
+
+  if (isNaN(gm) || isNaN(mi) || isNaN(ng)) {
+    return ctx.reply("❌ Tỷ lệ % phải là số nguyên hợp lệ!", { parse_mode: "Markdown" });
+  }
+
+  const updated = await configRepo.saveCommissionConfig({
+    goi_mong_percent: gm,
+    mi_percent: mi,
+    ngoai_gio_percent: ng
+  });
+
+  return ctx.reply(`✅ **Đã cập nhật tỷ lệ % hoa hồng doanh thu:**\n• Gội/Móng: **${updated.goi_mong_percent}%**\n• Mi/Phun xăm: **${updated.mi_percent}%**\n• Ngoài giờ/Tăng ca: **${updated.ngoai_gio_percent}%**`, { parse_mode: "Markdown" });
+}
+
+async function handleEditRevenue(ctx) {
+  const text = ctx.message.text.trim();
+  const match = text.match(/^\/editrevenue\s+(\S+)\s+"([^"]+)"\s+(\S+)\s+(\S+)\s+(\S+)$/) ||
+                text.match(/^\/editrevenue\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$/);
+
+  if (!match) {
+    return ctx.reply('⚠️ Cú pháp: `/editrevenue <REP_ID> "Tên NV" <GộiMóng> <Mi> <NgoàiGiờ>`\nVí dụ: `/editrevenue REP_12345 "Quỳnh Anh" 300k 400k 0`', { parse_mode: "Markdown" });
+  }
+
+  const [, repId, staffName, rawGM, rawMi, rawNG] = match;
+
+  const parseVal = (str) => {
+    if (!str || str === "0") return 0;
+    let s = str.toLowerCase().replace(/k/g, "000").replace(/tr/g, "000000");
+    return parseInt(s, 10) || 0;
+  };
+
+  const updated = await reportRepo.updateStaffRevenue(repId, staffName, parseVal(rawGM), parseVal(rawMi), parseVal(rawNG));
+
+  if (!updated) {
+    return ctx.reply(`❌ Không tìm thấy mã báo cáo \`${repId}\` để chỉnh sửa!`, { parse_mode: "Markdown" });
+  }
+
+  return ctx.reply(`✅ **Đã chỉnh sửa doanh số nhân viên thành công!**\n🆔 Mã ID: \`${repId}\`\n👤 Thợ: **${staffName}**`, { parse_mode: "Markdown" });
+}
+
+async function handleEditExpense(ctx) {
+  const parts = ctx.message.text.trim().split(" ");
+  if (parts.length < 3) {
+    return ctx.reply("⚠️ Cú pháp: `/editexpense <REP_ID> <Số_tiền> <Ghi_chú>`\nVí dụ: `/editexpense REP_12345 60k Mua nước đá`", { parse_mode: "Markdown" });
+  }
+
+  const repId = parts[1];
+  const rawAmt = parts[2];
+  const notes = parts.slice(3).join(" ") || "Chi tiêu điều chỉnh";
+
+  let amount = parseInt(rawAmt.toLowerCase().replace(/k/g, "000").replace(/tr/g, "000000"), 10) || 0;
+
+  const updated = await reportRepo.updateExpense(repId, amount, notes);
+  if (!updated) {
+    return ctx.reply(`❌ Không tìm thấy mã báo cáo \`${repId}\` để sửa chi tiêu!`, { parse_mode: "Markdown" });
+  }
+
+  return ctx.reply(`✅ **Đã sửa khoản chi tiêu thành công!**\n🆔 Mã ID: \`${repId}\`\n💸 Số tiền mới: **${amount.toLocaleString("vi-VN")}đ** (${notes})`, { parse_mode: "Markdown" });
+}
+
+async function handleDeleteReport(ctx) {
+  const parts = ctx.message.text.trim().split(" ");
+  if (parts.length < 2) {
+    return ctx.reply("⚠️ Cú pháp: `/deletereport <REP_ID>` (Ví dụ: `/deletereport REP_12345`)", { parse_mode: "Markdown" });
+  }
+
+  const repId = parts[1];
+  const deleted = await reportRepo.deleteReport(repId);
+
+  if (!deleted) {
+    return ctx.reply(`❌ Không tìm thấy lượt báo cáo với mã \`${repId}\`!`, { parse_mode: "Markdown" });
+  }
+
+  return ctx.reply(`🗑️ **Đã xóa hoàn toàn báo cáo \`${repId}\` khỏi hệ thống!**`, { parse_mode: "Markdown" });
+}
+
+async function handleDeleteRagop(ctx) {
+  const parts = ctx.message.text.trim().split(" ");
+  if (parts.length < 2) {
+    return ctx.reply("⚠️ Cú pháp: `/deleteragop <INS_ID>` (Ví dụ: `/deleteragop INS_12345`)", { parse_mode: "Markdown" });
+  }
+
+  const insId = parts[1];
+  const deleted = await installmentRepo.deleteInstallment(insId);
+
+  if (!deleted) {
+    return ctx.reply(`❌ Không tìm thấy hợp đồng trả góp với mã \`${insId}\`!`, { parse_mode: "Markdown" });
+  }
+
+  return ctx.reply(`🗑️ **Đã xóa hợp đồng trả góp \`${insId}\` thành công!**`, { parse_mode: "Markdown" });
+}
+
+module.exports = {
+  handleSetAdmin,
+  handleStaff,
+  handleAddStaff,
+  handleRemoveStaff,
+  handleSetStaff,
+  handleSetCommission,
+  handleEditRevenue,
+  handleEditExpense,
+  handleDeleteReport,
+  handleDeleteRagop
+};
