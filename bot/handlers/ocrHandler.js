@@ -81,9 +81,8 @@ async function processMediaBatch(mediaGroupId, statusMsg, batchData) {
   try {
     const imageBuffers = await Promise.all(
       photosData.map(async (p) => {
-        // Chọn độ phân giải vừa đủ (~500px) để dung lượng siêu nhẹ, Gemini đọc nhanh gấp 5 lần
-        const photoSizeIndex = Math.min(1, p.length - 1);
-        const targetPhoto = p[photoSizeIndex];
+        // Chọn độ phân giải cao nhất (p.length - 1) để chữ viết tay luôn sắc nét 100%
+        const targetPhoto = p[p.length - 1];
         const fileUrl = await ctx.telegram.getFileLink(targetPhoto.file_id);
         const res = await fetch(fileUrl.href);
         return await res.buffer();
@@ -215,8 +214,7 @@ async function handleOcrMessage(ctx, next) {
     const existingReports = await reportRepo.getDailyReports(todayStr);
 
     if (photo && photo.length > 0) {
-      const photoSizeIndex = Math.min(2, photo.length - 1);
-      const targetPhoto = photo[photoSizeIndex];
+      const targetPhoto = photo[photo.length - 1];
       const fileUrl = await ctx.telegram.getFileLink(targetPhoto.file_id);
       const res = await fetch(fileUrl.href);
       imageBuffer = await res.buffer();
