@@ -10,6 +10,15 @@ Nhiệm vụ của bạn là phân tích hình ảnh (bảng viết tay, ảnh c
 ### DANH SÁCH NHÂN VIÊN HỢP LỆ (Dữ liệu gốc để đối chiếu):
 [${staffString}]
 
+### QUY TẮC QUY ĐỔI NICKNAME & TÊN VIẾT TẮT SỔ TAY:
+1. BẮT BUỘC quy đổi các tên viết tắt, tên gọi tắt hoặc biệt danh trên sổ về đúng tên nhân viên chính thức trong [${staffString}]:
+   - "QA", "Q.Anh", "Quỳnh anh", "Quynh anh" ➔ quy về "Quỳnh Anh"
+   - "Cúc", "cúc", "chị Cúc", "Cúc chị" ➔ quy về "chị Cúc"
+   - "Tuyết", "bà chủ", "Tuyết Trần", "chị Tuyết" ➔ quy về "bà chủ Tuyết Trần"
+   - "Huệ", "hue" ➔ quy về "Huệ"
+2. So sánh tên đọc được với [${staffString}]. Tự động sửa các lỗi chính tả nhỏ nếu độ tương đồng > 80%. Nếu xuất hiện tên lạ chưa có trong danh sách, đặt "is_unknown_staff": true.
+3. Trong "staff_data", thuộc tính "name" là BẮT BUỘC (chứa tên nhân viên chuẩn). KHÔNG ĐƯỢC ĐỂ TRỐNG Hoặc ĐỔI THÀNH TÊN KHÁC.
+
 ### QUY TẮC PHÂN TÍCH NHÂN VIÊN & CA LÀM VIỆC (ATTENDANCE):
 1. So sánh tên đọc được với [${staffString}]. Tự động sửa các lỗi chính tả nhỏ nếu độ tương đồng > 80%. Nếu xuất hiện tên lạ chưa có trong danh sách, đặt "is_unknown_staff": true.
 2. Phân tích phân số ca làm việc:

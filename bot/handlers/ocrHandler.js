@@ -21,8 +21,9 @@ function formatReportResponse(reportData, reportId, targetDateStr) {
       const total = gm + mi + ng;
       grandTotal += total;
 
+      const staffName = s.name || s.staff_name || s.ten_nhan_vien || "Nhân viên";
       const unknownTag = s.is_unknown_staff ? " ⚠️ *(Tên mới)*" : "";
-      msg += `• **${s.name}**${unknownTag}:\n`;
+      msg += `• **${staffName}**${unknownTag}:\n`;
       msg += `  - Điểm công: \`${s.attendance_score !== undefined ? s.attendance_score : 1}\` *(${s.attendance_description || "Làm cả ngày"})*\n`;
       if (gm > 0) msg += `  - Gội/Móng: ${formatMoney(gm)}\n`;
       if (mi > 0) msg += `  - Mi/Xăm: ${formatMoney(mi)}\n`;
@@ -73,12 +74,9 @@ function formatReportResponse(reportData, reportId, targetDateStr) {
 // Bộ nhớ gom album ảnh gửi cùng lúc (MediaGroup Batch Store)
 const albumStore = new Map();
 
-async function processMediaBatch(mediaGroupId) {
-  const batchData = albumStore.get(mediaGroupId);
+async function processMediaBatch(mediaGroupId, statusMsg, batchData) {
   if (!batchData) return;
-  albumStore.delete(mediaGroupId);
-
-  const { ctx, photosData, textMsg, userInfo, statusMsg } = batchData;
+  const { ctx, photosData, textMsg, userInfo } = batchData;
 
   try {
     const imageBuffers = await Promise.all(
@@ -153,23 +151,27 @@ async function handleOcrMessage(ctx, next) {
   // Xử lý gửi Album nhiều ảnh cùng lúc
   if (mediaGroupId && photo) {
     if (!albumStore.has(mediaGroupId)) {
-      const statusMsg = await ctx.reply(`🔍 *Bot đã nhận album ảnh. Đang bóc tách dữ liệu từ các trang ảnh... Vui lòng đợi trong giây lát!*`, {
-        parse_mode: "Markdown"
-      });
-
+      // Đặt ngay trạng thái đồng bộ vào Map trước để chặn các ảnh 2, 3, 4 gửi tin nhắn lặp
       albumStore.set(mediaGroupId, {
         ctx,
         photosData: [photo],
         textMsg: textMsg || "",
         userInfo,
-        statusMsg,
+        statusMsgPromise: ctx.reply(`🔍 *Bot đã nhận album ảnh. Đang bóc tách dữ liệu từ các trang ảnh... Vui lòng đợi trong giây lát!*`, {
+          parse_mode: "Markdown"
+        }),
         timer: null
       });
 
       const entry = albumStore.get(mediaGroupId);
-      entry.timer = setTimeout(() => {
-        processMediaBatch(mediaGroupId);
-      }, 1200);
+      entry.timer = setTimeout(async () => {
+        const batchData = albumStore.get(mediaGroupId);
+        if (!batchData) return;
+        albumStore.delete(mediaGroupId);
+
+        const statusMsg = await batchData.statusMsgPromise;
+        processMediaBatch(mediaGroupId, statusMsg, batchData);
+      }, 1500);
 
     } else {
       const entry = albumStore.get(mediaGroupId);
@@ -177,9 +179,14 @@ async function handleOcrMessage(ctx, next) {
       if (textMsg && !entry.textMsg) entry.textMsg = textMsg;
 
       clearTimeout(entry.timer);
-      entry.timer = setTimeout(() => {
-        processMediaBatch(mediaGroupId);
-      }, 1200);
+      entry.timer = setTimeout(async () => {
+        const batchData = albumStore.get(mediaGroupId);
+        if (!batchData) return;
+        albumStore.delete(mediaGroupId);
+
+        const statusMsg = await batchData.statusMsgPromise;
+        processMediaBatch(mediaGroupId, statusMsg, batchData);
+      }, 1500);
     }
     return;
   }
