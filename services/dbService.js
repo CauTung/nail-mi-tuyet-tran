@@ -534,6 +534,9 @@ function getMonthlySummary(yearMonth) {
             if (!staffStats[s.name]) {
               staffStats[s.name] = { 
                 total_score: 0, 
+                days_worked: 0,
+                days_off: 0,
+                days_late: 0,
                 total_goi_mong: 0,
                 total_mi: 0,
                 total_ngoai_gio: 0,
@@ -545,7 +548,14 @@ function getMonthlySummary(yearMonth) {
                 attendance_notes: [] 
               };
             }
-            staffStats[s.name].total_score += (s.attendance_score || 0);
+            const score = s.attendance_score !== undefined ? s.attendance_score : 1;
+            staffStats[s.name].total_score += score;
+            if (score > 0) {
+              staffStats[s.name].days_worked += 1;
+            } else {
+              staffStats[s.name].days_off += 1;
+            }
+
             staffStats[s.name].total_goi_mong += goiMong;
             staffStats[s.name].total_mi += mi;
             staffStats[s.name].total_ngoai_gio += ngoaiGio;
@@ -563,6 +573,9 @@ function getMonthlySummary(yearMonth) {
             if (s.attendance_description) {
               const desc = s.attendance_description.trim();
               if (desc && desc !== "Làm cả ngày") {
+                if (desc.toLowerCase().includes("muộn")) {
+                  staffStats[s.name].days_late += 1;
+                }
                 staffStats[s.name].attendance_notes.push({
                   date: rep.date || file.replace(".json", ""),
                   note: desc
@@ -676,10 +689,10 @@ function exportMonthlyCsv(yearMonth) {
   const summary = getMonthlySummary(yearMonth);
   if (summary && summary.staffStats) {
     csvContent += "\n--- BẢNG TỔNG HỢP LƯƠNG & HOA HỒNG NHÂN VIÊN THÁNG ---\n";
-    csvContent += "Tên Nhân Viên,Tổng Công (Score),Tổng Gội/Móng (VNĐ),Tổng Mi/Phun Xăm (VNĐ),Tổng Tăng Ca (VNĐ),Tổng Doanh Thu NV (VNĐ),Lương % Gội/Móng (10%),Lương % Mi (30%),Lương % Tăng Ca (50%),TỔNG LƯƠNG % HOA HỒNG DOANH THU (VNĐ)\n";
+    csvContent += "Tên Nhân Viên,Tổng Công (Score),Số Ngày Làm,Số Ngày Nghỉ,Số Lần Muộn,Tổng Gội/Móng (VNĐ),Tổng Mi/Phun Xăm (VNĐ),Tổng Tăng Ca (VNĐ),Tổng Doanh Thu NV (VNĐ),Lương % Gội/Móng (10%),Lương % Mi (30%),Lương % Tăng Ca (50%),TỔNG LƯƠNG % HOA HỒNG DOANH THU (VNĐ)\n";
     Object.keys(summary.staffStats).forEach(name => {
       const st = summary.staffStats[name];
-      csvContent += `"${name}",${st.total_score},${st.total_goi_mong},${st.total_mi},${st.total_ngoai_gio},${st.total_revenue},${st.commission_goi_mong},${st.commission_mi},${st.commission_ngoai_gio},${st.total_commission}\n`;
+      csvContent += `"${name}",${st.total_score},${st.days_worked},${st.days_off},${st.days_late},${st.total_goi_mong},${st.total_mi},${st.total_ngoai_gio},${st.total_revenue},${st.commission_goi_mong},${st.commission_mi},${st.commission_ngoai_gio},${st.total_commission}\n`;
     });
   }
 
