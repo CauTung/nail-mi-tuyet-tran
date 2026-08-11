@@ -104,14 +104,25 @@ async function getWorkingModels(apiKey) {
       if (data && Array.isArray(data.models)) {
         const supported = data.models
           .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes("generateContent"))
-          .map(m => m.name.replace("models/", ""));
+          .map(m => m.name.replace("models/", ""))
+          .filter(name => {
+            // Loại bỏ các model không hỗ trợ Vision/ảnh hoặc bị deprecated
+            if (name.includes("tts") || name.includes("lyria") || name.includes("gemma") || name.includes("robotics") || name.includes("computer-use") || name.includes("deep-research") || name.includes("customtools")) return false;
+            if (name === "gemini-2.5-flash" || name === "gemini-1.5-flash" || name === "gemini-1.5-pro") return false;
+            return true;
+          });
 
-        console.log("🤖 [AI DYNAMIC DISCOVERY] Danh sách model Google hoạt động 100%:", supported);
+        console.log("🤖 [AI DYNAMIC DISCOVERY] Danh sách Vision Model hợp lệ 100%:", supported);
 
-        // Sắp xếp ưu tiên các model flash trước
+        // Danh sách ưu tiên các model xử lý Vision tốt nhất và ổn định nhất
+        const priorityList = ["gemini-flash-latest", "gemini-2.5-flash-image", "gemini-3-flash-preview", "gemini-flash-lite-latest", "gemini-pro-latest"];
+
         const sorted = supported.sort((a, b) => {
-          if (a.includes("flash") && !b.includes("flash")) return -1;
-          if (!a.includes("flash") && b.includes("flash")) return 1;
+          const idxA = priorityList.indexOf(a);
+          const idxB = priorityList.indexOf(b);
+          if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+          if (idxA !== -1) return -1;
+          if (idxB !== -1) return 1;
           return 0;
         });
 
@@ -122,7 +133,7 @@ async function getWorkingModels(apiKey) {
     console.warn("⚠️ Không thể quét danh sách model từ Google API:", e.message);
   }
 
-  return ["gemini-2.0-flash"];
+  return ["gemini-flash-latest"];
 }
 
 async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeType = "image/jpeg", customStaffList, existingReports }) {
