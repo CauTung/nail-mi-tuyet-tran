@@ -70,9 +70,73 @@ function formatReportResponse(reportData, reportId, targetDateStr) {
   return msg;
 }
 
+// Bộ nhớ gom album ảnh gửi cùng lúc (MediaGroup Batch Store)
+const albumStore = new Map();
+
+async function processMediaBatch(mediaGroupId) {
+  const batchData = albumStore.get(mediaGroupId);
+  if (!batchData) return;
+  albumStore.delete(mediaGroupId);
+
+  const { ctx, photosData, textMsg, userInfo, statusMsg } = batchData;
+
+  try {
+    const imageBuffers = [];
+    for (const p of photosData) {
+      const photoSizeIndex = Math.min(2, p.length - 1);
+      const targetPhoto = p[photoSizeIndex];
+      const fileUrl = await ctx.telegram.getFileLink(targetPhoto.file_id);
+      const res = await fetch(fileUrl.href);
+      const buf = await res.buffer();
+      imageBuffers.push(buf);
+    }
+
+    const todayStr = new Date().toISOString().substring(0, 10);
+    const existingReports = await reportRepo.getDailyReports(todayStr);
+    const currentStaff = await staffRepo.getStaffList();
+
+    const result = await aiService.extractDailyReport({
+      textInput: textMsg,
+      imageBuffers,
+      mimeType: "image/jpeg",
+      customStaffList: currentStaff,
+      existingReports
+    });
+
+    imageBuffers.forEach(buf => reportRepo.savePhotoLog(buf, result));
+
+    if (!result || result.status !== "success") {
+      await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
+      return ctx.reply("❌ **Không thể phân tích dữ liệu từ các ảnh.** Vui lòng gửi lại ảnh rõ hơn!", {
+        parse_mode: "Markdown"
+      });
+    }
+
+    if (result.is_financial_report === false && result.chat_reply) {
+      await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
+      return ctx.reply(result.chat_reply, { parse_mode: "Markdown" });
+    }
+
+    const saved = await reportRepo.saveReport(result, {
+      userInfo,
+      inputType: `photo_album (${imageBuffers.length} ảnh)`
+    });
+
+    const replyMsg = formatReportResponse(result, saved.record.id, saved.dateStr);
+    await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
+    await ctx.reply(replyMsg, { parse_mode: "Markdown" });
+
+  } catch (err) {
+    console.error("Lỗi xử lý OCR album ảnh:", err);
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+    await ctx.reply(`❌ **Đã xảy ra lỗi khi đọc album ảnh:** ${err.message}`, { parse_mode: "Markdown" });
+  }
+}
+
 async function handleOcrMessage(ctx, next) {
   const textMsg = ctx.message.text || ctx.message.caption || "";
   const photo = ctx.message.photo;
+  const mediaGroupId = ctx.message.media_group_id;
 
   // Nếu là câu lệnh (bắt đầu bằng '/'), chuyển qua handler lệnh
   if (textMsg.startsWith("/")) {
@@ -85,6 +149,41 @@ async function handleOcrMessage(ctx, next) {
     username: ctx.from.username
   };
 
+  // Xử lý gửi Album nhiều ảnh cùng lúc
+  if (mediaGroupId && photo) {
+    if (!albumStore.has(mediaGroupId)) {
+      const statusMsg = await ctx.reply(`🔍 *Bot đã nhận album ảnh. Đang bóc tách dữ liệu từ các trang ảnh... Vui lòng đợi trong giây lát!*`, {
+        parse_mode: "Markdown"
+      });
+
+      albumStore.set(mediaGroupId, {
+        ctx,
+        photosData: [photo],
+        textMsg: textMsg || "",
+        userInfo,
+        statusMsg,
+        timer: null
+      });
+
+      const entry = albumStore.get(mediaGroupId);
+      entry.timer = setTimeout(() => {
+        processMediaBatch(mediaGroupId);
+      }, 1200);
+
+    } else {
+      const entry = albumStore.get(mediaGroupId);
+      entry.photosData.push(photo);
+      if (textMsg && !entry.textMsg) entry.textMsg = textMsg;
+
+      clearTimeout(entry.timer);
+      entry.timer = setTimeout(() => {
+        processMediaBatch(mediaGroupId);
+      }, 1200);
+    }
+    return;
+  }
+
+  // Xử lý đơn lẻ 1 ảnh hoặc 1 tin nhắn văn bản
   const statusMsg = await ctx.reply("🔍 *Bot đang dùng Gemini Vision AI phân tích báo cáo... Vui lòng đợi trong giây lát!*", {
     parse_mode: "Markdown"
   });
@@ -97,7 +196,6 @@ async function handleOcrMessage(ctx, next) {
     const existingReports = await reportRepo.getDailyReports(todayStr);
 
     if (photo && photo.length > 0) {
-      // Chọn kích thước ảnh tối ưu (Large ~800-1280px) để vừa đọc rõ chữ vừa tải siêu nhanh
       const photoSizeIndex = Math.min(2, photo.length - 1);
       const targetPhoto = photo[photoSizeIndex];
       const fileUrl = await ctx.telegram.getFileLink(targetPhoto.file_id);
@@ -133,7 +231,6 @@ async function handleOcrMessage(ctx, next) {
       });
     }
 
-    // Nếu đây là tin nhắn hỏi đáp / trò chuyện thông thường (không phải báo cáo tài chính)
     if (result.is_financial_report === false && result.chat_reply) {
       await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
       return ctx.reply(result.chat_reply, { parse_mode: "Markdown" });

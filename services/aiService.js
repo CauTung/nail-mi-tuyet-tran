@@ -83,7 +83,7 @@ CẤU TRÚC JSON MẪU 2 (DÀNH CHO TRÒ CHUYỆN / HỎI ĐÁP CHUNG):
 }`;
 }
 
-async function extractDailyReport({ textInput, imageBuffer, mimeType = "image/jpeg", customStaffList, existingReports }) {
+async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeType = "image/jpeg", customStaffList, existingReports }) {
   const apiKey = env.geminiApiKey;
   if (!apiKey) {
     throw new Error("Chưa cấu hình GEMINI_API_KEY trong file .env!");
@@ -96,7 +96,7 @@ async function extractDailyReport({ textInput, imageBuffer, mimeType = "image/jp
   let lastError = null;
 
   // Hàm bọc Timeout tránh treo request quá lâu
-  const withTimeout = (promise, ms = 12000) => {
+  const withTimeout = (promise, ms = 15000) => {
     return Promise.race([
       promise,
       new Promise((_, reject) => setTimeout(() => reject(new Error("Hết thời gian phản hồi (Timeout)")), ms))
@@ -123,14 +123,23 @@ async function extractDailyReport({ textInput, imageBuffer, mimeType = "image/jp
         contents.push(`Dữ liệu báo cáo dạng văn bản:\n"""${textInput}"""`);
       }
 
-      if (imageBuffer) {
-        contents.push({
-          inlineData: {
-            data: imageBuffer.toString("base64"),
-            mimeType: mimeType
+      const buffers = Array.isArray(imageBuffers) && imageBuffers.length > 0 
+        ? imageBuffers 
+        : (imageBuffer ? [imageBuffer] : []);
+
+      if (buffers.length > 0) {
+        buffers.forEach((buf, idx) => {
+          contents.push({
+            inlineData: {
+              data: buf.toString("base64"),
+              mimeType: mimeType
+            }
+          });
+          if (buffers.length > 1) {
+            contents.push(`[Trang ảnh số ${idx + 1}/${buffers.length}]`);
           }
         });
-        contents.push("Hãy phân tích hình ảnh báo cáo viết tay/chụp màn hình trên theo đúng quy tắc.");
+        contents.push(`Hãy phân tích và tổng hợp toàn bộ ${buffers.length} trang ảnh báo cáo trên theo đúng quy tắc.`);
       }
 
       const result = await withTimeout(model.generateContent(contents), 15000);
