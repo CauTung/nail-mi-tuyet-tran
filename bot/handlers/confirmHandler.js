@@ -3,6 +3,8 @@ const staffRepo = require("../../db/repositories/staffRepository");
 
 // Mảng lưu bản nháp tạm thời trong bộ nhớ server trước khi bấm nút xác nhận
 const draftStore = new Map();
+// Mảng lưu trạng thái chờ tin nhắn đính chính (Sửa Nhanh) từ người dùng (key: userId)
+const pendingEdits = new Map();
 
 function saveDraft(result, metaInfo) {
   const draftId = `DRAFT_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -26,6 +28,24 @@ function getDraft(draftId) {
 
 function deleteDraft(draftId) {
   draftStore.delete(draftId);
+}
+
+function setPendingEdit(userId, draftId) {
+  pendingEdits.set(userId, { draftId, createdAt: Date.now() });
+  setTimeout(() => {
+    if (pendingEdits.get(userId)?.draftId === draftId) {
+      pendingEdits.delete(userId);
+    }
+  }, 15 * 60 * 1000);
+}
+
+function getPendingEdit(userId) {
+  const pending = pendingEdits.get(userId);
+  return pending ? pending.draftId : null;
+}
+
+function clearPendingEdit(userId) {
+  pendingEdits.delete(userId);
 }
 
 function formatPreviewResponse(reportData, targetDateStr, confidence, dateReasoning, existingCount = 0) {
@@ -116,7 +136,7 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
 
   if (existingCount > 0) {
     msg += `⚠️ **CẢNH BÁO TRÙNG LẶP:** Ngày \`${targetDateStr}\` **ĐÃ CÓ ${existingCount} BÁO CÁO** trước đó!\n`;
-    msg += `Vui lòng chọn **[Cộng dồn]** hoặc **[Ghi đè]** bên dưới:`;
+    msg += `Vui lòng chọn **[Cộng dồn]**, **[Ghi đè]** hoặc **[Sửa nhanh]** bên dưới:`;
   } else {
     msg += `❓ **Vui lòng kiểm tra lại thông tin trên và chọn thao tác:**`;
   }
@@ -133,6 +153,7 @@ function buildPreviewKeyboards(draftId, existingCount = 0) {
           { text: "🔄 Ghi Đè Bản Cũ", callback_data: `confirm_overwrite:${draftId}` }
         ],
         [
+          { text: "✏️ Sửa Nhanh", callback_data: `edit_draft:${draftId}` },
           { text: "❌ Hủy Bỏ", callback_data: `cancel_report:${draftId}` }
         ]
       ]
@@ -143,6 +164,9 @@ function buildPreviewKeyboards(draftId, existingCount = 0) {
     inline_keyboard: [
       [
         { text: "✅ Xác Nhận Lưu", callback_data: `confirm_save:${draftId}` },
+        { text: "✏️ Sửa Nhanh", callback_data: `edit_draft:${draftId}` }
+      ],
+      [
         { text: "❌ Hủy Bỏ", callback_data: `cancel_report:${draftId}` }
       ]
     ]
@@ -194,6 +218,7 @@ async function handleCallbackQuery(ctx) {
     await autoSaveNewStaff(draft.result.staff_data);
 
     deleteDraft(draftId);
+    clearPendingEdit(ctx.from.id);
     await ctx.editMessageText(`✅ **ĐÃ LƯU THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n🆔 Mã báo cáo: \`${saved.record.id}\``, {
       parse_mode: "Markdown"
     });
@@ -210,13 +235,30 @@ async function handleCallbackQuery(ctx) {
     await autoSaveNewStaff(draft.result.staff_data);
 
     deleteDraft(draftId);
+    clearPendingEdit(ctx.from.id);
     await ctx.editMessageText(`🔄 **ĐÃ GHI ĐÈ THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n📦 Bản cũ đã được sao lưu an toàn.\n🆔 Mã báo cáo mới: \`${saved.record.id}\``, {
       parse_mode: "Markdown"
     });
 
+  } else if (action === "edit_draft") {
+    setPendingEdit(ctx.from.id, draftId);
+    await ctx.answerCbQuery("✏️ Vui lòng gõ tin nhắn đính chính số liệu!");
+    let editPromptMsg = `✏️ **BẠN ĐANG CHỌN SỬA NHANH BÁO CÁO**\n`;
+    editPromptMsg += `------------------------------------\n`;
+    editPromptMsg += `Vui lòng nhập tin nhắn đính chính ngay bên dưới.\n\n`;
+    editPromptMsg += `💡 *Ví dụ:* \n`;
+    editPromptMsg += `• \`Sửa ngày thành 12/08/2026\`\n`;
+    editPromptMsg += `• \`Quỳnh Anh móng 300k, mi 200k\`\n`;
+    editPromptMsg += `• \`Chi 50k mua nước đá\`\n`;
+    editPromptMsg += `• \`Đổi tên Ngọc Mới thành Nhi\`\n\n`;
+    editPromptMsg += `👉 *Sau khi bạn gửi tin nhắn đính chính, Bot sẽ cập nhật lại bản Xem Trước cho bạn!*`;
+
+    await ctx.reply(editPromptMsg, { parse_mode: "Markdown" });
+
   } else if (action === "cancel_report") {
     await ctx.answerCbQuery("Đã hủy bỏ báo cáo.");
     deleteDraft(draftId);
+    clearPendingEdit(ctx.from.id);
     await ctx.editMessageText("❌ **Đã hủy bỏ lượt ghi nhận báo cáo.**", { parse_mode: "Markdown" });
   }
 }
@@ -225,6 +267,9 @@ module.exports = {
   saveDraft,
   getDraft,
   deleteDraft,
+  setPendingEdit,
+  getPendingEdit,
+  clearPendingEdit,
   formatPreviewResponse,
   buildPreviewKeyboards,
   handleCallbackQuery

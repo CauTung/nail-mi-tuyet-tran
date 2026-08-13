@@ -152,6 +152,61 @@ async function handleOcrMessage(ctx, next) {
     username: ctx.from.username
   };
 
+  // Xử lý đính chính Quick Edit (Sửa Nhanh)
+  const pendingDraftId = confirmHandler.getPendingEdit(ctx.from.id);
+  if (pendingDraftId && textMsg.trim().length > 0 && !photo) {
+    const draft = confirmHandler.getDraft(pendingDraftId);
+    if (!draft) {
+      confirmHandler.clearPendingEdit(ctx.from.id);
+      return ctx.reply("⚠️ *Bản nháp báo cáo đã hết hạn hoặc đã được xử lý. Vui lòng gửi lại ảnh!*", { parse_mode: "Markdown" });
+    }
+
+    const statusMsg = await ctx.reply("🔄 *Bot đang điều chỉnh số liệu báo cáo theo đính chính của bạn... Vui lòng đợi trong giây lát!*", {
+      parse_mode: "Markdown"
+    });
+
+    try {
+      const currentStaff = await staffRepo.getStaffList();
+      const promptContext = `BẢN BÁO CÁO HIỆN TẠI:\n${JSON.stringify(draft.result, null, 2)}\n\nYÊU CẦU ĐÍNH CHÍNH / SỬA ĐỔI CỦA NGƯỜI DÙNG:\n"""${textMsg}"""\n\nHãy điều chỉnh toàn bộ JSON báo cáo trên theo đúng yêu cầu đính chính của người dùng. Giữ nguyên các thông tin đúng và chỉ sửa đổi/bổ sung các thông tin được yêu cầu.`;
+
+      const updatedResult = await aiService.extractDailyReport({
+        textInput: promptContext,
+        customStaffList: currentStaff,
+        existingReports: []
+      });
+
+      if (updatedResult && updatedResult.status === "success" && updatedResult.is_financial_report !== false) {
+        draft.result = updatedResult;
+        confirmHandler.clearPendingEdit(ctx.from.id);
+
+        const targetDateStr = updatedResult.report_date || draft.result.report_date || new Date().toISOString().substring(0, 10);
+        const existingReportsForDate = await reportRepo.getDailyReports(targetDateStr);
+        const existingCount = existingReportsForDate ? existingReportsForDate.length : 0;
+
+        const previewMsg = confirmHandler.formatPreviewResponse(
+          updatedResult,
+          targetDateStr,
+          updatedResult.date_confidence || "high",
+          updatedResult.date_reasoning || "Đã cập nhật theo tin nhắn đính chính",
+          existingCount
+        );
+        const replyMarkup = confirmHandler.buildPreviewKeyboards(pendingDraftId, existingCount);
+
+        try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+        await ctx.reply(`✨ **ĐÃ CẬP NHẬT ĐÍNH CHÍNH BÁO CÁO!**\n\n${previewMsg}`, {
+          parse_mode: "Markdown",
+          reply_markup: replyMarkup
+        });
+        return;
+      }
+    } catch (err) {
+      console.error("Lỗi khi đính chính báo cáo:", err);
+      try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+      await ctx.reply(`❌ **Không thể cập nhật đính chính:** ${err.message}`, { parse_mode: "Markdown" });
+      return;
+    }
+  }
+
   // Xử lý gửi Album nhiều ảnh cùng lúc
   if (mediaGroupId && photo) {
     if (!albumStore.has(mediaGroupId)) {
