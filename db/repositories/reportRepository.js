@@ -43,15 +43,50 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
   const yearMonth = `${year}-${month}`;
   const reportId = `REP_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
-  // Nếu chọn chế độ thay thế (replace_all), xóa các báo cáo cũ trong cùng ngày
+  // Nếu chọn chế độ thay thế (replace_all), lưu backup toàn bộ báo cáo cũ của ngày trước khi cập nhật
   if (reportData.replacement_mode === "replace_all") {
-    if (isSupabaseConnected()) {
-      try {
-        await supabase.from("reports").delete().eq("report_date", targetDate);
-      } catch (e) {
-        console.error("Lỗi xóa báo cáo cũ trên Supabase:", e);
+    const existingReports = await getDailyReports(targetDate);
+    if (existingReports && existingReports.length > 0) {
+      const backupId = `BAK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const backupRecord = {
+        id: backupId,
+        original_report_date: targetDate,
+        action_type: "overwrite",
+        user_info: metaInfo.userInfo || null,
+        snapshot_data: existingReports,
+        created_at: now.toISOString()
+      };
+
+      // Backup local JSON
+      const backupDir = path.join(DATA_DIR, "backups");
+      if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+      fs.writeFileSync(path.join(backupDir, `${backupId}.json`), JSON.stringify(backupRecord, null, 2), "utf-8");
+
+      // Backup Supabase
+      if (isSupabaseConnected()) {
+        try {
+          await supabase.from("report_backups").insert({
+            id: backupId,
+            original_report_id: existingReports[0]?.id || "BULK",
+            report_date: targetDate,
+            action_type: "overwrite",
+            user_info: metaInfo.userInfo || null,
+            snapshot_data: existingReports,
+            created_at: now.toISOString()
+          });
+
+          // Soft delete bằng cách cập nhật status = 'overwritten'
+          await supabase.from("reports")
+            .update({ status: "overwritten" })
+            .eq("report_date", targetDate)
+            .eq("status", "active");
+        } catch (e) {
+          console.error("Lỗi lưu backup báo cáo trên Supabase:", e);
+        }
       }
     }
+
+    // Reset file JSON local thành mảng rỗng cho ngày đó
     const monthFolder = path.join(REPORTS_DIR, yearMonth);
     const dailyFile = path.join(monthFolder, `${targetDate}.json`);
     if (fs.existsSync(dailyFile)) {
@@ -355,6 +390,110 @@ function savePhotoLog(imageBuffer, parsedResult, errorMsg = null) {
   return { baseName, dateFolder };
 }
 
+async function getBackupsByDate(dateStr) {
+  if (isSupabaseConnected()) {
+    try {
+      const { data, error } = await supabase
+        .from("report_backups")
+        .select("*")
+        .eq("report_date", dateStr)
+        .order("created_at", { ascending: false });
+      if (!error && data) return data;
+    } catch (e) {
+      console.error("Lỗi lấy danh sách backup từ Supabase:", e);
+    }
+  }
+
+  ensureLocalDirs();
+  const backupDir = path.join(DATA_DIR, "backups");
+  if (!fs.existsSync(backupDir)) return [];
+
+  const files = fs.readdirSync(backupDir).filter(f => f.endsWith(".json"));
+  const backups = [];
+  files.forEach(f => {
+    try {
+      const content = JSON.parse(fs.readFileSync(path.join(backupDir, f), "utf-8"));
+      if (content.original_report_date === dateStr || content.report_date === dateStr) {
+        backups.push(content);
+      }
+    } catch (e) {}
+  });
+
+  return backups.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+async function restoreReportBackup(backupId) {
+  let backupData = null;
+
+  if (isSupabaseConnected()) {
+    try {
+      const { data } = await supabase.from("report_backups").select("*").eq("id", backupId).single();
+      if (data) backupData = data;
+    } catch (e) {}
+  }
+
+  if (!backupData) {
+    const backupFile = path.join(DATA_DIR, "backups", `${backupId}.json`);
+    if (fs.existsSync(backupFile)) {
+      try { backupData = JSON.parse(fs.readFileSync(backupFile, "utf-8")); } catch (e) {}
+    }
+  }
+
+  if (!backupData) {
+    throw new Error(`Không tìm thấy bản ghi sao lưu có ID: ${backupId}`);
+  }
+
+  const reportsToRestore = backupData.snapshot_data || backupData.raw_data;
+  const targetDate = backupData.report_date || backupData.original_report_date;
+
+  if (!Array.isArray(reportsToRestore) || reportsToRestore.length === 0) {
+    throw new Error("Bản sao lưu không chứa dữ liệu hợp lệ để khôi phục!");
+  }
+
+  // Khôi phục file local JSON
+  const [year, month] = targetDate.split("-");
+  const monthFolder = path.join(REPORTS_DIR, `${year}-${month}`);
+  if (!fs.existsSync(monthFolder)) fs.mkdirSync(monthFolder, { recursive: true });
+  const dailyFile = path.join(monthFolder, `${targetDate}.json`);
+  fs.writeFileSync(dailyFile, JSON.stringify(reportsToRestore, null, 2), "utf-8");
+
+  // Khôi phục Supabase nếu có
+  if (isSupabaseConnected()) {
+    try {
+      // Đặt lại status = 'active' cho các báo cáo trong snapshot
+      for (const rep of reportsToRestore) {
+        const parsed = rep.parsed_result || rep;
+        await supabase.from("reports").upsert({
+          id: rep.id,
+          report_date: targetDate,
+          user_info: rep.user_info,
+          input_type: rep.input_type || "restored",
+          raw_data: parsed,
+          status: "active"
+        });
+      }
+    } catch (e) {
+      console.error("Lỗi khôi phục Supabase:", e);
+    }
+  }
+
+  return { targetDate, restoredCount: reportsToRestore.length };
+}
+
+async function logAuditAction(action, targetDate, reportId, userInfo, details) {
+  if (isSupabaseConnected()) {
+    try {
+      await supabase.from("audit_logs").insert({
+        action,
+        target_date: targetDate,
+        report_id: reportId,
+        user_info: userInfo,
+        details
+      });
+    } catch (e) {}
+  }
+}
+
 module.exports = {
   saveReport,
   deleteReport,
@@ -363,5 +502,9 @@ module.exports = {
   getDailyReports,
   getMonthlyReportsList,
   savePhotoLog,
-  getDateKeys
+  getDateKeys,
+  getBackupsByDate,
+  restoreReportBackup,
+  logAuditAction
 };
+

@@ -1,6 +1,7 @@
 require("dotenv").config();
-const { extractDailyReport, getSystemPrompt } = require("./services/geminiService");
-const { getStaffList } = require("./config/staff");
+const { extractDailyReport } = require("./services/aiService");
+const { getSystemPrompt } = require("./config/prompts");
+const staffRepo = require("./db/repositories/staffRepository");
 
 async function runTest() {
   console.log("=== KIỂM TRA HỆ THỐNG OCR & BÓC TÁCH DỮ LIỆU SPA/SALON ===");

@@ -4,6 +4,7 @@ const { adminOnlyMiddleware } = require("./middlewares/authMiddleware");
 const ocrHandler = require("./handlers/ocrHandler");
 const queryHandler = require("./handlers/queryHandler");
 const adminHandler = require("./handlers/adminHandler");
+const confirmHandler = require("./handlers/confirmHandler");
 const reminderService = require("../services/reminderService");
 
 function createBotApp() {
@@ -26,6 +27,8 @@ function createBotApp() {
     msg += `• \`/luong\`: Xem bảng tính công & lương % hoa hồng nhân viên\n`;
     msg += `• \`/export\`: Xuất file Excel/CSV báo cáo tháng tải về\n`;
     msg += `• \`/tragop\`: Xem danh sách máy móc trả góp dài hạn\n`;
+    msg += `• \`/history YYYY-MM-DD\`: Xem lịch sử các bản sao lưu bị ghi đè\n`;
+    msg += `• \`/restore <backup_id>\`: Khôi phục bản báo cáo cũ bị ghi đè nhầm\n`;
     msg += `• \`/myid\`: Kiểm tra Telegram User ID và quyền hạn của bạn\n`;
     msg += `• \`/setadmin\`: Đăng ký làm Admin chủ tiệm (nếu hệ thống chưa có Admin)\n`;
     ctx.reply(msg, { parse_mode: "Markdown" });
@@ -40,6 +43,8 @@ function createBotApp() {
   bot.command("tragop", queryHandler.handleTragop);
   bot.command("myid", queryHandler.handleMyId);
   bot.command("addpast", queryHandler.handleAddPast);
+  bot.command("history", queryHandler.handleHistory);
+  bot.command("restore", adminOnlyMiddleware, queryHandler.handleRestore);
   bot.command(["mau", "template"], adminHandler.handleMau);
 
   // Registration for Admin
@@ -55,6 +60,9 @@ function createBotApp() {
   bot.command("editexpense", adminOnlyMiddleware, adminHandler.handleEditExpense);
   bot.command("deletereport", adminOnlyMiddleware, adminHandler.handleDeleteReport);
   bot.command("deleteragop", adminOnlyMiddleware, adminHandler.handleDeleteRagop);
+
+  // Inline Keyboards Callback Router
+  bot.on("callback_query", confirmHandler.handleCallbackQuery);
 
   // OCR Listeners for text and photo reports
   bot.on("text", ocrHandler.handleOcrMessage);

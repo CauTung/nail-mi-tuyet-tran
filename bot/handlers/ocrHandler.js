@@ -2,6 +2,7 @@ const fetch = require("node-fetch");
 const aiService = require("../../services/aiService");
 const reportRepo = require("../../db/repositories/reportRepository");
 const staffRepo = require("../../db/repositories/staffRepository");
+const confirmHandler = require("./confirmHandler");
 
 function formatMoney(amount) {
   return new Intl.NumberFormat("vi-VN").format(amount || 0) + "đ";
@@ -104,37 +105,29 @@ async function processMediaBatch(mediaGroupId, statusMsg, batchData) {
 
     imageBuffers.forEach(buf => reportRepo.savePhotoLog(buf, result));
 
-    if (!result || result.status !== "success") {
-      await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-      return ctx.reply("❌ **Không thể phân tích dữ liệu từ các ảnh.** Vui lòng gửi lại ảnh rõ hơn!", {
-        parse_mode: "Markdown"
-      });
-    }
+    const targetDateStr = result.report_date || todayStr;
+    const existingReportsForDate = await reportRepo.getDailyReports(targetDateStr);
+    const existingCount = existingReportsForDate ? existingReportsForDate.length : 0;
 
-    if (result.is_financial_report === false && result.chat_reply) {
-      await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-      return ctx.reply(result.chat_reply, { parse_mode: "Markdown" });
-    }
-
-    const saved = await reportRepo.saveReport(result, {
+    const draftId = confirmHandler.saveDraft(result, {
       userInfo,
       inputType: `photo_album (${imageBuffers.length} ảnh)`
     });
 
-    // Tự động lưu nhân viên mới vào DB nếu AI phát hiện tên mới
-    if (Array.isArray(result.staff_data)) {
-      for (const s of result.staff_data) {
-        const staffName = (s.name || s.staff_name || s.ten_nhan_vien || "").trim();
-        if (staffName && s.is_unknown_staff) {
-          await staffRepo.addStaff(staffName);
-          console.log(`✨ [TỰ ĐỘNG LƯU NHÂN VIÊN MỚI] Đã ghi nhận nhân viên mới: "${staffName}"`);
-        }
-      }
-    }
+    const previewMsg = confirmHandler.formatPreviewResponse(
+      result,
+      targetDateStr,
+      result.date_confidence || "medium",
+      result.date_reasoning || "",
+      existingCount
+    );
+    const replyMarkup = confirmHandler.buildPreviewKeyboards(draftId, existingCount);
 
-    const replyMsg = formatReportResponse(result, saved.record.id, saved.dateStr);
     await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-    await ctx.reply(replyMsg, { parse_mode: "Markdown" });
+    await ctx.reply(previewMsg, {
+      parse_mode: "Markdown",
+      reply_markup: replyMarkup
+    });
 
   } catch (err) {
     console.error("Lỗi xử lý OCR album ảnh:", err);
@@ -254,25 +247,29 @@ async function handleOcrMessage(ctx, next) {
       return ctx.reply(result.chat_reply, { parse_mode: "Markdown" });
     }
 
-    const saved = await reportRepo.saveReport(result, {
+    const targetDateStr = result.report_date || todayStr;
+    const existingReportsForDate = await reportRepo.getDailyReports(targetDateStr);
+    const existingCount = existingReportsForDate ? existingReportsForDate.length : 0;
+
+    const draftId = confirmHandler.saveDraft(result, {
       userInfo,
       inputType: photo ? "photo" : "text"
     });
 
-    // Tự động lưu nhân viên mới vào DB nếu AI phát hiện tên mới
-    if (Array.isArray(result.staff_data)) {
-      for (const s of result.staff_data) {
-        const staffName = (s.name || s.staff_name || s.ten_nhan_vien || "").trim();
-        if (staffName && s.is_unknown_staff) {
-          await staffRepo.addStaff(staffName);
-          console.log(`✨ [TỰ ĐỘNG LƯU NHÂN VIÊN MỚI] Đã ghi nhận nhân viên mới: "${staffName}"`);
-        }
-      }
-    }
+    const previewMsg = confirmHandler.formatPreviewResponse(
+      result,
+      targetDateStr,
+      result.date_confidence || "medium",
+      result.date_reasoning || "",
+      existingCount
+    );
+    const replyMarkup = confirmHandler.buildPreviewKeyboards(draftId, existingCount);
 
-    const replyMsg = formatReportResponse(result, saved.record.id, saved.dateStr);
     await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id);
-    await ctx.reply(replyMsg, { parse_mode: "Markdown" });
+    await ctx.reply(previewMsg, {
+      parse_mode: "Markdown",
+      reply_markup: replyMarkup
+    });
 
   } catch (err) {
     console.error("Lỗi xử lý OCR message:", err);

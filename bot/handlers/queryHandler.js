@@ -210,6 +210,56 @@ async function handleAddPast(ctx) {
   }
 }
 
+async function handleHistory(ctx) {
+  const text = ctx.message.text.trim();
+  const parts = text.split(/\s+/);
+  const targetDate = parts[1] || new Date().toISOString().substring(0, 10);
+
+  const backups = await reportRepo.getBackupsByDate(targetDate);
+  if (!backups || backups.length === 0) {
+    return ctx.reply(`📦 **LỊCH SỬ BÁO CÁO NGÀY ${targetDate}:**\nChưa có bản sao lưu (backup) nào ghi nhận bị ghi đè hoặc chỉnh sửa trong ngày này.`, {
+      parse_mode: "Markdown"
+    });
+  }
+
+  let msg = `📦 **DANH SÁCH BẢN SAO LƯU BỊ GHI ĐÈ NGÀY ${targetDate}:**\n`;
+  msg += `------------------------------------\n`;
+
+  backups.forEach((b, idx) => {
+    const createdTime = new Date(b.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+    const count = Array.isArray(b.snapshot_data) ? b.snapshot_data.length : 1;
+    msg += `${idx + 1}. 🆔 Backup ID: \`${b.id}\` (${createdTime})\n`;
+    msg += `   • Hành động: \`${b.action_type || b.action}\` (${count} lượt báo cáo)\n`;
+    msg += `   • Lệnh phục hồi: \`/restore ${b.id}\`\n\n`;
+  });
+
+  return ctx.reply(msg, { parse_mode: "Markdown" });
+}
+
+async function handleRestore(ctx) {
+  const text = ctx.message.text.trim();
+  const parts = text.split(/\s+/);
+  const backupId = parts[1];
+
+  if (!backupId) {
+    return ctx.reply("⚠️ Cú pháp chưa đúng! Vui lòng nhập: `/restore <BACKUP_ID>`\nVí dụ: `/restore BAK_172345678_123`", {
+      parse_mode: "Markdown"
+    });
+  }
+
+  try {
+    const result = await reportRepo.restoreReportBackup(backupId);
+    const userInfo = { id: ctx.from.id, first_name: ctx.from.first_name, username: ctx.from.username };
+    await reportRepo.logAuditAction("RESTORE", result.targetDate, backupId, userInfo, `Khôi phục thành công ${result.restoredCount} lượt báo cáo`);
+
+    return ctx.reply(`🎉 **ĐÃ KHÔI PHỤC THÀNH CÔNG ${result.restoredCount} LƯỢT BÁO CÁO CỦA NGÀY ${result.targetDate}!**\nDữ liệu cũ đã được khôi phục nguyên vẹn.`, {
+      parse_mode: "Markdown"
+    });
+  } catch (err) {
+    return ctx.reply(`❌ **Khôi phục thất bại:** ${err.message}`, { parse_mode: "Markdown" });
+  }
+}
+
 module.exports = {
   handleToday,
   handleMonth,
@@ -218,5 +268,7 @@ module.exports = {
   handleSearch,
   handleTragop,
   handleMyId,
-  handleAddPast
+  handleAddPast,
+  handleHistory,
+  handleRestore
 };

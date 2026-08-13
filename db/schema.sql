@@ -48,10 +48,12 @@ CREATE TABLE IF NOT EXISTS reports (
     user_info JSONB,
     input_type VARCHAR(50) DEFAULT 'text',
     raw_data JSONB,
+    status VARCHAR(20) DEFAULT 'active', -- 'active', 'overwritten', 'deleted'
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_reports_report_date ON reports(report_date);
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 
 -- 5. Table: report_staff_revenue (Doanh số & công của nhân viên từng lượt báo cáo)
 CREATE TABLE IF NOT EXISTS report_staff_revenue (
@@ -111,4 +113,31 @@ CREATE TABLE IF NOT EXISTS ocr_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ocr_logs_date ON ocr_logs(report_date);
+
+-- 9. Table: report_backups (Lưu vết sao lưu các phiên bản báo cáo cũ trước khi bị ghi đè hoặc sửa)
+CREATE TABLE IF NOT EXISTS report_backups (
+    id VARCHAR(100) PRIMARY KEY, -- BAK_timestamp_random
+    original_report_id VARCHAR(100) NOT NULL,
+    report_date DATE NOT NULL,
+    action_type VARCHAR(50) NOT NULL, -- 'overwrite', 'edit', 'delete'
+    user_info JSONB,
+    snapshot_data JSONB NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_backups_date ON report_backups(report_date);
+
+-- 10. Table: audit_logs (Nhật ký theo dõi mọi hành động thay đổi dữ liệu của bot)
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id SERIAL PRIMARY KEY,
+    action VARCHAR(50) NOT NULL, -- 'CREATE', 'OVERWRITE', 'EDIT', 'DELETE', 'RESTORE'
+    target_date DATE,
+    report_id VARCHAR(100),
+    user_info JSONB,
+    details TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_date ON audit_logs(target_date);
+
 
