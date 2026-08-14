@@ -52,6 +52,9 @@ CREATE TABLE IF NOT EXISTS reports (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Tự động bổ sung cột status nếu bảng reports đã tồn tại từ trước
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'active';
+
 CREATE INDEX IF NOT EXISTS idx_reports_report_date ON reports(report_date);
 CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
 
