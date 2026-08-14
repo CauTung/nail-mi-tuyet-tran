@@ -1,10 +1,10 @@
 require("dotenv").config();
 
 const config = {
-  telegramToken: process.env.TELEGRAM_BOT_TOKEN || "",
-  geminiApiKey: process.env.GEMINI_API_KEY || "",
-  supabaseUrl: process.env.SUPABASE_URL || "",
-  supabaseKey: process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || "",
+  telegramToken: (process.env.TELEGRAM_BOT_TOKEN || "").trim(),
+  geminiApiKey: (process.env.GEMINI_API_KEY || "").trim(),
+  supabaseUrl: (process.env.SUPABASE_URL || "").trim().replace(/['"]/g, ""),
+  supabaseKey: (process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || "").trim().replace(/['"]/g, ""),
   adminUserIds: (process.env.ADMIN_USER_IDS || "")
     .split(",")
     .map(id => id.trim())
