@@ -217,8 +217,21 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
       if (s.is_unknown_staff) {
         warnings.push(`⚠️ Tên thợ **"${staffName}"** chưa có trong hệ thống (sẽ tự động thêm khi chốt lưu).`);
       }
-      if (total > 5000000) {
-        warnings.push(`💰 Doanh số thợ **"${staffName}"** cao bất thường (${formatMoney(total)} > 5 triệu).`);
+      if (total >= 1000000) {
+        warnings.push(`💰 Doanh số thợ **"${staffName}"** trong ngày lớn (**${formatMoney(total)}** ≥ 1.000.000đ).`);
+      }
+
+      if (s.revenue && typeof s.revenue === "object") {
+        Object.entries(s.revenue).forEach(([catKey, val]) => {
+          const num = Number(val) || 0;
+          if (num >= 350000) {
+            warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **${catKey}** lớn bất thường (**${formatMoney(num)}** ≥ 350.000đ).`);
+          }
+        });
+      } else {
+        if (s.goi_mong >= 350000) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Gội/Móng** lớn bất thường (**${formatMoney(s.goi_mong)}** ≥ 350.000đ).`);
+        if (s.mi >= 350000) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Mi/Xăm** lớn bất thường (**${formatMoney(s.mi)}** ≥ 350.000đ).`);
+        if (s.ngoai_gio >= 350000) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Ngoài giờ** lớn bất thường (**${formatMoney(s.ngoai_gio)}** ≥ 350.000đ).`);
       }
 
       const breakdownParts = getStaffRevenueBreakdown(s);
