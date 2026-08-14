@@ -153,21 +153,79 @@ async function handleOcrMessage(ctx, next) {
   };
 
   // Xử lý đính chính Quick Edit (Sửa Nhanh)
-  const pendingDraftId = confirmHandler.getPendingEdit(ctx.from.id);
-  if (pendingDraftId && textMsg.trim().length > 0 && !photo) {
-    const draft = confirmHandler.getDraft(pendingDraftId);
+  const pendingEditObj = confirmHandler.getPendingEdit(ctx.from.id);
+  if (pendingEditObj && textMsg.trim().length > 0 && !photo) {
+    const draftId = pendingEditObj.draftId;
+    const draft = confirmHandler.getDraft(draftId);
     if (!draft) {
       confirmHandler.clearPendingEdit(ctx.from.id);
       return ctx.reply("⚠️ *Bản nháp báo cáo đã hết hạn hoặc đã được xử lý. Vui lòng gửi lại ảnh!*", { parse_mode: "Markdown" });
     }
 
+    const { editType, itemIndex } = pendingEditObj;
+
+    // Xử lý trực tiếp nếu là Sửa Ngày
+    if (editType === "date") {
+      const input = textMsg.trim();
+      let newDateStr = null;
+      const dmMatch = input.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{4}))?$/);
+      if (dmMatch) {
+        const day = dmMatch[1].padStart(2, "0");
+        const month = dmMatch[2].padStart(2, "0");
+        const year = dmMatch[3] || new Date().getFullYear();
+        newDateStr = `${year}-${month}-${day}`;
+      } else if (/^\d{4}-\d{2}-\d{2}$/.test(input)) {
+        newDateStr = input;
+      }
+
+      if (newDateStr) {
+        draft.result.report_date = newDateStr;
+        draft.result.date_confidence = "high";
+        draft.result.date_reasoning = "Đã cập nhật thủ công theo yêu cầu";
+        confirmHandler.clearPendingEdit(ctx.from.id);
+
+        const existingReportsForDate = await reportRepo.getDailyReports(newDateStr);
+        const existingCount = existingReportsForDate ? existingReportsForDate.length : 0;
+        const previewMsg = confirmHandler.formatPreviewResponse(
+          draft.result,
+          newDateStr,
+          "high",
+          "Đã cập nhật ngày mới thủ công",
+          existingCount
+        );
+        const replyMarkup = confirmHandler.buildPreviewKeyboards(draftId, existingCount);
+
+        return ctx.reply(`✨ **ĐÃ CẬP NHẬT NGÀY BÁO CÁO!**\n\n${previewMsg}`, {
+          parse_mode: "Markdown",
+          reply_markup: replyMarkup
+        });
+      }
+    }
+
+    // Xử lý bằng AI cho thợ, chi tiêu, thêm mới hoặc copy text
     const statusMsg = await ctx.reply("🔄 *Bot đang điều chỉnh số liệu báo cáo theo đính chính của bạn... Vui lòng đợi trong giây lát!*", {
       parse_mode: "Markdown"
     });
 
     try {
       const currentStaff = await staffRepo.getStaffList();
-      const promptContext = `BẢN BÁO CÁO HIỆN TẠI:\n${JSON.stringify(draft.result, null, 2)}\n\nYÊU CẦU ĐÍNH CHÍNH / SỬA ĐỔI CỦA NGƯỜI DÙNG:\n"""${textMsg}"""\n\nHãy điều chỉnh toàn bộ JSON báo cáo trên theo đúng yêu cầu đính chính của người dùng. Giữ nguyên các thông tin đúng và chỉ sửa đổi/bổ sung các thông tin được yêu cầu.`;
+      let promptInstruction = "";
+
+      if (editType === "staff_item" && itemIndex !== null && draft.result.staff_data?.[itemIndex]) {
+        const staffName = draft.result.staff_data[itemIndex].name || draft.result.staff_data[itemIndex].staff_name;
+        promptInstruction = `Cập nhật doanh số thợ "${staffName}" theo thông tin mới: "${textMsg}". Giữ nguyên tên thợ và cập nhật doanh số/các khoản thu của thợ này.`;
+      } else if (editType === "add_staff") {
+        promptInstruction = `Thêm thợ mới vào danh sách staff_data theo thông tin: "${textMsg}".`;
+      } else if (editType === "expense_item" && itemIndex !== null && draft.result.expenses_data?.[itemIndex]) {
+        const oldExp = draft.result.expenses_data[itemIndex];
+        promptInstruction = `Cập nhật khoản chi "${oldExp.notes || oldExp.category}" tại vị trí chỉ số ${itemIndex} theo thông tin mới: "${textMsg}".`;
+      } else if (editType === "add_expense") {
+        promptInstruction = `Thêm khoản chi mới vào danh sách expenses_data theo thông tin: "${textMsg}".`;
+      } else {
+        promptInstruction = `Điều chỉnh bản báo cáo theo đúng thông tin/văn bản mới sau: "${textMsg}". Cập nhật ngày, thợ, chi tiêu phù hợp.`;
+      }
+
+      const promptContext = `BẢN BÁO CÁO HIỆN TẠI:\n${JSON.stringify(draft.result, null, 2)}\n\nYÊU CẦU ĐÍNH CHÍNH / SỬA ĐỔI:\n"""${promptInstruction}"""\n\nHãy điều chỉnh toàn bộ JSON báo cáo trên theo đúng yêu cầu đính chính của người dùng. Giữ nguyên các thông tin đúng và chỉ sửa đổi/bổ sung các thông tin được yêu cầu.`;
 
       const updatedResult = await aiService.extractDailyReport({
         textInput: promptContext,
@@ -190,7 +248,7 @@ async function handleOcrMessage(ctx, next) {
           updatedResult.date_reasoning || "Đã cập nhật theo tin nhắn đính chính",
           existingCount
         );
-        const replyMarkup = confirmHandler.buildPreviewKeyboards(pendingDraftId, existingCount);
+        const replyMarkup = confirmHandler.buildPreviewKeyboards(draftId, existingCount);
 
         try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
         await ctx.reply(`✨ **ĐÃ CẬP NHẬT ĐÍNH CHÍNH BÁO CÁO!**\n\n${previewMsg}`, {

@@ -4,6 +4,8 @@ const staffRepo = require("../db/repositories/staffRepository");
 const { getSystemPrompt } = require("../config/prompts");
 const fetch = require("node-fetch");
 
+const ocrService = require("./ocrService");
+
 async function getWorkingModels(apiKey) {
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
@@ -58,6 +60,20 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
     ? imageBuffers 
     : (imageBuffer ? [imageBuffer] : []);
 
+  let ocrExtractedText = null;
+  if (buffers.length > 0) {
+    try {
+      const ocrTexts = await Promise.all(buffers.map(buf => ocrService.extractTextFromImage(buf)));
+      const validTexts = ocrTexts.filter(t => t && t.trim().length > 0);
+      if (validTexts.length > 0) {
+        ocrExtractedText = validTexts.map((t, idx) => `[VĂN BẢN ĐỌC ĐƯỢC TỪ TRANG ẢNH ${idx + 1}]:\n${t}`).join("\n\n");
+        console.log("⚡ [HYBRID OCR] Đã bóc tách văn bản qua Google Cloud Vision OCR thành công!");
+      }
+    } catch (e) {
+      console.warn("⚠️ [HYBRID OCR] Không thể bóc tách qua Vision API, sẽ fallback dùng Gemini Vision direct:", e.message);
+    }
+  }
+
   const timeoutMs = buffers.length > 1 ? 60000 : 30000;
 
   const withTimeout = (promise, ms = timeoutMs) => {
@@ -88,7 +104,10 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
         contents.push(`Dữ liệu báo cáo dạng văn bản:\n"""${textInput}"""`);
       }
 
-      if (buffers.length > 0) {
+      if (ocrExtractedText) {
+        contents.push(`Dữ liệu văn bản bóc tách từ ảnh sổ tay:\n"""\n${ocrExtractedText}\n"""`);
+        contents.push(`Hãy phân tích dữ liệu văn bản bóc tách trên theo đúng quy tắc systemInstruction để tạo JSON báo cáo.`);
+      } else if (buffers.length > 0) {
         buffers.forEach((buf, idx) => {
           contents.push({
             inlineData: {

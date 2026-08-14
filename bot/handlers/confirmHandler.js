@@ -30,8 +30,8 @@ function deleteDraft(draftId) {
   draftStore.delete(draftId);
 }
 
-function setPendingEdit(userId, draftId) {
-  pendingEdits.set(userId, { draftId, createdAt: Date.now() });
+function setPendingEdit(userId, draftId, editType = "general", itemIndex = null) {
+  pendingEdits.set(userId, { draftId, editType, itemIndex, createdAt: Date.now() });
   setTimeout(() => {
     if (pendingEdits.get(userId)?.draftId === draftId) {
       pendingEdits.delete(userId);
@@ -40,8 +40,7 @@ function setPendingEdit(userId, draftId) {
 }
 
 function getPendingEdit(userId) {
-  const pending = pendingEdits.get(userId);
-  return pending ? pending.draftId : null;
+  return pendingEdits.get(userId) || null;
 }
 
 function clearPendingEdit(userId) {
@@ -173,9 +172,110 @@ function buildPreviewKeyboards(draftId, existingCount = 0) {
   };
 }
 
+function buildEditMenuKeyboards(draftId) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "📅 Sửa Ngày Ghi Nhận", callback_data: `edit_date:${draftId}` }
+      ],
+      [
+        { text: "👩‍🎨 Sửa Doanh Số Thợ", callback_data: `edit_staff_menu:${draftId}` },
+        { text: "💸 Sửa Chi Tiêu", callback_data: `edit_expense_menu:${draftId}` }
+      ],
+      [
+        { text: "📋 Copy Text Để Sửa", callback_data: `copy_text_format:${draftId}` }
+      ],
+      [
+        { text: "🔙 Quay Lại Xem Trước", callback_data: `back_to_preview:${draftId}` }
+      ]
+    ]
+  };
+}
+
+function buildStaffListKeyboards(draftId, staffData = []) {
+  const keyboard = [];
+  if (Array.isArray(staffData) && staffData.length > 0) {
+    staffData.forEach((s, idx) => {
+      const gm = (typeof s.revenue === "object" ? s.revenue?.goi_mong : 0) || s.goi_mong || 0;
+      const mi = (typeof s.revenue === "object" ? s.revenue?.mi : 0) || s.mi || 0;
+      const ng = (typeof s.revenue === "object" ? s.revenue?.ngoai_gio : 0) || s.ngoai_gio || 0;
+      const total = gm + mi + ng;
+      const staffName = s.name || s.staff_name || `Thợ ${idx + 1}`;
+      keyboard.push([
+        { text: `👩‍🎨 ${staffName}: ${new Intl.NumberFormat("vi-VN").format(total)}đ`, callback_data: `edit_staff_item:${draftId}:${idx}` }
+      ]);
+    });
+  }
+  keyboard.push([
+    { text: "➕ Thêm Thợ Mới", callback_data: `add_staff_item:${draftId}` }
+  ]);
+  keyboard.push([
+    { text: "🔙 Quay Lại Menu Sửa", callback_data: `edit_draft:${draftId}` }
+  ]);
+  return { inline_keyboard: keyboard };
+}
+
+function buildExpenseListKeyboards(draftId, expensesData = []) {
+  const keyboard = [];
+  if (Array.isArray(expensesData) && expensesData.length > 0) {
+    expensesData.forEach((exp, idx) => {
+      const amt = exp.amount || 0;
+      const notes = exp.notes || exp.category || `Chi tiêu ${idx + 1}`;
+      keyboard.push([
+        { text: `💸 ${notes}: ${new Intl.NumberFormat("vi-VN").format(amt)}đ`, callback_data: `edit_expense_item:${draftId}:${idx}` }
+      ]);
+    });
+  }
+  keyboard.push([
+    { text: "➕ Thêm Khoản Chi Mới", callback_data: `add_expense_item:${draftId}` }
+  ]);
+  keyboard.push([
+    { text: "🔙 Quay Lại Menu Sửa", callback_data: `edit_draft:${draftId}` }
+  ]);
+  return { inline_keyboard: keyboard };
+}
+
+function formatCopyableText(reportData, targetDateStr) {
+  let text = `📝 **SỬA BÁO CÁO THU CHI**\n*(Sao chép đoạn dưới, sửa thông tin và gửi lại Bot)*\n\n`;
+  text += `\`\`\`text\n`;
+  text += `Ngày: ${targetDateStr}\n`;
+  text += `------------------------------------\n`;
+  text += `Thợ:\n`;
+  if (Array.isArray(reportData.staff_data) && reportData.staff_data.length > 0) {
+    reportData.staff_data.forEach(s => {
+      const name = s.name || s.staff_name || "Nhân viên";
+      const gm = (typeof s.revenue === "object" ? s.revenue?.goi_mong : 0) || s.goi_mong || 0;
+      const mi = (typeof s.revenue === "object" ? s.revenue?.mi : 0) || s.mi || 0;
+      const ng = (typeof s.revenue === "object" ? s.revenue?.ngoai_gio : 0) || s.ngoai_gio || 0;
+      let parts = [];
+      if (gm > 0) parts.push(`Gội/Móng ${new Intl.NumberFormat("vi-VN").format(gm)}đ`);
+      if (mi > 0) parts.push(`Mi/Xăm ${new Intl.NumberFormat("vi-VN").format(mi)}đ`);
+      if (ng > 0) parts.push(`Ngoài giờ ${new Intl.NumberFormat("vi-VN").format(ng)}đ`);
+      if (parts.length === 0) parts.push(`${new Intl.NumberFormat("vi-VN").format(gm + mi + ng)}đ`);
+      text += `- ${name}: ${parts.join(", ")}\n`;
+    });
+  } else {
+    text += `- (Chưa có thông tin thợ)\n`;
+  }
+  text += `------------------------------------\n`;
+  text += `Chi tiêu:\n`;
+  if (Array.isArray(reportData.expenses_data) && reportData.expenses_data.length > 0) {
+    reportData.expenses_data.forEach(exp => {
+      text += `- ${exp.notes || exp.category}: ${new Intl.NumberFormat("vi-VN").format(exp.amount || 0)}đ\n`;
+    });
+  } else {
+    text += `- (Không có chi tiêu)\n`;
+  }
+  text += `\`\`\``;
+  return text;
+}
+
 async function handleCallbackQuery(ctx) {
   const data = ctx.callbackQuery.data || "";
-  const [action, draftId] = data.split(":");
+  const parts = data.split(":");
+  const action = parts[0];
+  const draftId = parts[1];
+  const itemIndex = parts[2] !== undefined ? parseInt(parts[2], 10) : null;
 
   if (!action || !draftId) return ctx.answerCbQuery("❌ Yêu cầu không hợp lệ!");
 
@@ -241,19 +341,88 @@ async function handleCallbackQuery(ctx) {
     });
 
   } else if (action === "edit_draft") {
-    setPendingEdit(ctx.from.id, draftId);
-    await ctx.answerCbQuery("✏️ Vui lòng gõ tin nhắn đính chính số liệu!");
-    let editPromptMsg = `✏️ **BẠN ĐANG CHỌN SỬA NHANH BÁO CÁO**\n`;
-    editPromptMsg += `------------------------------------\n`;
-    editPromptMsg += `Vui lòng nhập tin nhắn đính chính ngay bên dưới.\n\n`;
-    editPromptMsg += `💡 *Ví dụ:* \n`;
-    editPromptMsg += `• \`Sửa ngày thành 12/08/2026\`\n`;
-    editPromptMsg += `• \`Quỳnh Anh móng 300k, mi 200k\`\n`;
-    editPromptMsg += `• \`Chi 50k mua nước đá\`\n`;
-    editPromptMsg += `• \`Đổi tên Ngọc Mới thành Nhi\`\n\n`;
-    editPromptMsg += `👉 *Sau khi bạn gửi tin nhắn đính chính, Bot sẽ cập nhật lại bản Xem Trước cho bạn!*`;
+    await ctx.answerCbQuery("✏️ Menu Sửa Nhanh");
+    const editMenuText = `✏️ **MENU SỬA NHANH BÁO CÁO**\n------------------------------------\nVui lòng chọn thông tin bạn muốn chỉnh sửa bên dưới:`;
+    const keyboard = buildEditMenuKeyboards(draftId);
+    try {
+      await ctx.editMessageText(editMenuText, { parse_mode: "Markdown", reply_markup: keyboard });
+    } catch (e) {
+      await ctx.reply(editMenuText, { parse_mode: "Markdown", reply_markup: keyboard });
+    }
 
-    await ctx.reply(editPromptMsg, { parse_mode: "Markdown" });
+  } else if (action === "edit_date") {
+    setPendingEdit(ctx.from.id, draftId, "date");
+    await ctx.answerCbQuery("📅 Nhập ngày mới");
+    await ctx.reply(`📅 **SỬA NGÀY GHI NHẬN**\nVui lòng nhập ngày mới bên dưới (Ví dụ: \`14/08\` hoặc \`2026-08-14\`):`, { parse_mode: "Markdown" });
+
+  } else if (action === "edit_staff_menu") {
+    await ctx.answerCbQuery("👩‍🎨 Danh sách thợ");
+    const staffText = `👩‍🎨 **CHỌN THỢ CẦN CHỈNH SỬA DOANH SỐ:**\nBấm vào tên thợ bên dưới để cập nhật số tiền:`;
+    const keyboard = buildStaffListKeyboards(draftId, draft.result.staff_data);
+    try {
+      await ctx.editMessageText(staffText, { parse_mode: "Markdown", reply_markup: keyboard });
+    } catch (e) {
+      await ctx.reply(staffText, { parse_mode: "Markdown", reply_markup: keyboard });
+    }
+
+  } else if (action === "edit_staff_item") {
+    setPendingEdit(ctx.from.id, draftId, "staff_item", itemIndex);
+    await ctx.answerCbQuery("👩‍🎨 Nhập doanh số thợ");
+    const staffObj = draft.result.staff_data?.[itemIndex];
+    const sName = staffObj?.name || staffObj?.staff_name || "Nhân viên";
+    await ctx.reply(`👩‍🎨 **SỬA DOANH SỐ THỢ "${sName}"**\nVui lòng nhập số tiền mới (Ví dụ: \`300k\` hoặc \`Gội 200k mi 100k\`):`, { parse_mode: "Markdown" });
+
+  } else if (action === "add_staff_item") {
+    setPendingEdit(ctx.from.id, draftId, "add_staff");
+    await ctx.answerCbQuery("➕ Thêm thợ mới");
+    await ctx.reply(`➕ **THÊM THỢ MỚI VÀO BÁO CÁO**\nVui lòng nhập tên thợ và doanh số (Ví dụ: \`Trang móng 200k\` hoặc \`Hoa 300k\`):`, { parse_mode: "Markdown" });
+
+  } else if (action === "edit_expense_menu") {
+    await ctx.answerCbQuery("💸 Danh sách chi tiêu");
+    const expText = `💸 **CHỌN KHOẢN CHI CẦN CHỈNH SỬA:**\nBấm vào mục chi bên dưới để cập nhật số tiền:`;
+    const keyboard = buildExpenseListKeyboards(draftId, draft.result.expenses_data);
+    try {
+      await ctx.editMessageText(expText, { parse_mode: "Markdown", reply_markup: keyboard });
+    } catch (e) {
+      await ctx.reply(expText, { parse_mode: "Markdown", reply_markup: keyboard });
+    }
+
+  } else if (action === "edit_expense_item") {
+    setPendingEdit(ctx.from.id, draftId, "expense_item", itemIndex);
+    await ctx.answerCbQuery("💸 Nhập số tiền chi");
+    const expObj = draft.result.expenses_data?.[itemIndex];
+    const expNote = expObj?.notes || expObj?.category || "Khoản chi";
+    await ctx.reply(`💸 **SỬA KHOẢN CHI "${expNote}"**\nVui lòng nhập số tiền mới hoặc tên khoản chi (Ví dụ: \`100k\` hoặc \`Mua chổi 120k\`):`, { parse_mode: "Markdown" });
+
+  } else if (action === "add_expense_item") {
+    setPendingEdit(ctx.from.id, draftId, "add_expense");
+    await ctx.answerCbQuery("➕ Thêm khoản chi mới");
+    await ctx.reply(`➕ **THÊM KHOẢN CHI MỚI**\nVui lòng nhập nội dung và số tiền (Ví dụ: \`50k mua nước đá\` hoặc \`Ăn trưa 80k\`):`, { parse_mode: "Markdown" });
+
+  } else if (action === "copy_text_format") {
+    setPendingEdit(ctx.from.id, draftId, "copy_text");
+    await ctx.answerCbQuery("📋 Bán text mẫu");
+    const copyText = formatCopyableText(draft.result, draft.result.report_date || new Date().toISOString().substring(0, 10));
+    await ctx.reply(copyText, { parse_mode: "Markdown" });
+
+  } else if (action === "back_to_preview") {
+    await ctx.answerCbQuery("📋 Quay lại xem trước");
+    const targetDateStr = draft.result.report_date || new Date().toISOString().substring(0, 10);
+    const existingReportsForDate = await reportRepo.getDailyReports(targetDateStr);
+    const existingCount = existingReportsForDate ? existingReportsForDate.length : 0;
+    const previewMsg = formatPreviewResponse(
+      draft.result,
+      targetDateStr,
+      draft.result.date_confidence || "medium",
+      draft.result.date_reasoning || "",
+      existingCount
+    );
+    const replyMarkup = buildPreviewKeyboards(draftId, existingCount);
+    try {
+      await ctx.editMessageText(previewMsg, { parse_mode: "Markdown", reply_markup: replyMarkup });
+    } catch (e) {
+      await ctx.reply(previewMsg, { parse_mode: "Markdown", reply_markup: replyMarkup });
+    }
 
   } else if (action === "cancel_report") {
     await ctx.answerCbQuery("Đã hủy bỏ báo cáo.");
@@ -272,5 +441,9 @@ module.exports = {
   clearPendingEdit,
   formatPreviewResponse,
   buildPreviewKeyboards,
+  buildEditMenuKeyboards,
+  buildStaffListKeyboards,
+  buildExpenseListKeyboards,
+  formatCopyableText,
   handleCallbackQuery
 };

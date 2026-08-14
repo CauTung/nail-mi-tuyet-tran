@@ -1,84 +1,44 @@
 # 💅 Nail Mi Tuyết Trần - Daily OCR & Financial Telegram Bot 💇‍♀️
 
-Hệ thống **Telegram Bot AI OCR & Quản lý Báo cáo Thu Chi Tự động** chuyên dụng cho tiệm **Nail Mi Tuyết Trần**.
-Dự án được xây dựng chuẩn **Clean Architecture**, tích hợp **Google Gemini 2.0 Flash Vision AI** và **Supabase PostgreSQL Cloud Database** để vận hành 24/7 bền vững trên **Render.com**.
+Hệ thống **Telegram Bot AI OCR & Quản lý Tài chính - Thu Chi Tự Động** chuyên dụng cho tiệm **Nail Mi Tuyết Trần**. 
+
+Bot giải quyết triệt để bài toán bóc tách dữ liệu từ sổ tay viết tay hàng ngày, tính toán hoa hồng thợ, quản lý chi tiêu và hợp đồng mua trả góp máy móc, đồng thời hỗ trợ sửa đổi trực quan và gửi cảnh báo bất thường theo thời gian thực.
 
 ---
 
-## 🏗️ Cấu Trúc Hệ Thống (Clean Architecture)
+## 🎯 Nghiệp Vụ Cốt Lõi (Business Domain & Features)
 
-```text
-nail-mi-tuyet-tran/
-├── config/
-│   ├── env.js                      # Đọc & kiểm tra biến môi trường (.env)
-│   └── supabase.js                 # Khởi tạo kết nối Supabase Client
-├── db/
-│   ├── schema.sql                  # Script tạo 6 bảng dữ liệu trên Supabase
-│   ├── migrateFromJson.js          # Script tự động đẩy file JSON cũ lên Supabase
-│   └── repositories/               # Tầng tương tác Cơ sở dữ liệu (Data Access Layer)
-│       ├── staffRepository.js      # CRUD danh sách nhân viên
-│       ├── adminRepository.js      # Quản lý phân quyền Admin
-│       ├── configRepository.js     # Cấu hình hoa hồng %
-│       ├── reportRepository.js     # Lưu/Sửa/Xóa báo cáo thu chi
-│       └── installmentRepository.js# Quản lý hợp đồng mua trả góp
-├── services/
-│   ├── aiService.js                # Xử lý OCR hình ảnh & tin nhắn bằng Gemini Vision AI
-│   ├── financialService.js         # Logic tính toán tổng hợp thu chi, % lương thợ, lợi nhuận
-│   └── exportService.js            # Xuất file báo cáo Excel/CSV UTF-8
-├── bot/
-│   ├── middlewares/
-│   │   └── authMiddleware.js       # Phân quyền Admin Telegram
-│   ├── handlers/
-│   │   ├── ocrHandler.js           # Xử lý tin nhắn & hình ảnh báo cáo OCR
-│   │   ├── queryHandler.js         # Các lệnh tra cứu: /today, /month, /luong, /export, /search, /tragop...
-│   │   └── adminHandler.js         # Các lệnh Admin: /staff, /setcommission, /editrevenue, /deletereport...
-│   └── botApp.js                   # Đăng ký Router & Handler cho Telegraf Bot
-├── bot.js                          # Entrypoint khởi chạy ứng dụng chính
-├── package.json                    # Thư viện phụ thuộc & script
-└── README.md                       # Tài liệu hướng dẫn hệ thống
-```
+### 1. 📸 Bóc Tách Báo Cáo Viết Tay Siêu Tốc (Hybrid OCR < 1s)
+- **Đọc ảnh đa dạng**: Hỗ trợ gửi 1 ảnh hoặc Album nhiều ảnh chụp sổ tay thu chi.
+- **Tự động bóc tách**: Phân loại chính xác Ngày ghi nhận, Doanh số từng thợ (Gội/Móng, Mi/Xăm, Tăng ca/Ngoài giờ), Điểm chấm công (Làm cả ngày, 1/2 ngày, 3/4 ngày), các Khoản Chi và Hợp đồng Mua Trả Góp mới.
+- **Xử lý dòng gạch xóa**: Tự động nhận diện và bỏ qua các số tiền/dòng chữ bị gạch xóa trên sổ.
+
+### 2. ✏️ Hệ Thống Sửa Nhanh Tương Tác (Smart Interactive Quick Edit)
+- **Menu nút bấm trực quan (Inline Keyboards)**: Sửa Ngày, Sửa Doanh số từng thợ, Sửa từng Khoản chi hoặc Thêm mới ngay trên tin nhắn Xem Trước (Preview).
+- **Copyable Text Format**: Xuất bản mẫu văn bản chuẩn dạng code block cho phép copy, chỉnh sửa trực tiếp và gửi lại Bot để cập nhật bản nháp.
+
+### 3. 🚨 Cảnh Báo Bất Thường & An Toàn (Anomaly & Safety Warnings)
+- **Thợ mới (`is_unknown_staff`)**: Phát hiện tên thợ chưa có trong hệ thống và tự động lưu vào CSDL khi chốt báo cáo.
+- **Doanh số bất thường**: Cảnh báo khi doanh số 1 thợ > 5,000,000đ hoặc tổng doanh thu ngày > 15,000,000đ.
+- **Khoản chi lớn**: Cảnh báo khi phát sinh khoản chi tiêu > 2,000,000đ.
+- **Trùng lặp báo cáo**: Cảnh báo ngày đã có dữ liệu trước đó và cung cấp nút bấm `[Cộng Dồn]` hoặc `[Ghi Đè]` (có sao lưu bản cũ).
+
+### 4. 💰 Quản Lý Thu Chi, Lương Thợ & Trả Góp
+- **Tính lương thợ tự động**: Áp dụng tỷ lệ % hoa hồng riêng biệt theo từng hạng mục (Gội/Móng, Mi/Xăm, Ngoài giờ) và số công.
+- **Khấu trừ mua trả góp**: Tự động trừ chi phí mua trả góp thiết bị/máy móc tiệm vào Lợi nhuận ròng từ các tháng tiếp theo.
+- **Báo cáo & Xuất file**: Tra cứu `/today`, `/month`, `/luong` và xuất báo cáo file Excel/CSV UTF-8 tải về trực tiếp trên Telegram.
 
 ---
 
-## ⚡ Hướng Dẫn Cấu Hình Supabase (Cloud Database)
+## 🛠️ Công Nghệ Sử Dụng (Technology Stack)
 
-1. Truy cập [https://supabase.com/](https://supabase.com/) ➔ Đăng ký/Đăng nhập tài khoản miễn phí.
-2. Tạo một **New Project** mới.
-3. Vào mục **SQL Editor** trong thanh menu bên trái ➔ Mở file [`db/schema.sql`](file:///c:/Users/laptop/Documents/nail-mi-tuyet-tran/db/schema.sql) trong dự án ➔ Copy toàn bộ nội dung dán vào và nhấn **RUN**.
-4. Vào mục **Project Settings** ➔ **API** ➔ Copy 2 thông số:
-   * **Project URL**: `SUPABASE_URL`
-   * **anon public key**: `SUPABASE_KEY`
-
----
-
-## 🚀 Đẩy Dữ Liệu Cũ Lên Supabase (Migration)
-
-Nếu bạn đã dùng bot trước đây và có các file báo cáo JSON trong thư mục `data/`:
-1. Điền `SUPABASE_URL` và `SUPABASE_KEY` vào file `.env`.
-2. Chạy lệnh migration:
-```bash
-npm run migrate
-```
-Toàn bộ nhân viên, admin, hợp đồng trả góp và các bài báo cáo cũ sẽ được tự động đồng bộ lên Supabase!
-
----
-
-## 🌐 Cấu Hình Chạy 24/7 Trên Render.com
-
-1. Đăng nhập vào [Render.com](https://render.com/).
-2. Chọn **New +** ➔ **Web Service** (hoặc Background Worker).
-3. Kết nối với Repository GitHub dự án này.
-4. Cấu hình các thông số:
-   * **Runtime**: `Node`
-   * **Build Command**: `npm install`
-   * **Start Command**: `npm start`
-5. Trong mục **Environment Variables**, thêm các biến sau:
-   * `TELEGRAM_BOT_TOKEN`: Token bot lấy từ BotFather.
-   * `GEMINI_API_KEY`: API Key lấy từ Google AI Studio.
-   * `ADMIN_USER_IDS`: Telegram User ID của chủ tiệm.
-   * `SUPABASE_URL`: URL project Supabase.
-   * `SUPABASE_KEY`: Anon Key của Supabase.
-6. Nhấn **Create Web Service**. Bot sẽ chạy online 24/7 và lưu trữ dữ liệu an toàn trên Supabase mà không sợ mất file!
+- **Ngôn ngữ & Runtime**: Node.js (v24+ ESM/CJS).
+- **Bot Framework**: Telegraf 4.x (Telegram Bot API Framework).
+- **Bóc Tách Chữ Viết Tay (Fast OCR)**: Google Cloud Vision API (`DOCUMENT_TEXT_DETECTION` - Chuyên dụng cho chữ viết tay mật độ cao tiếng Việt).
+- **Trí Tuệ Nhân Tạo (AI LLM)**: Google Gemini AI (`@google/generative-ai` - Dynamic discovery model).
+- **Cơ Sở Dữ Liệu (Database)**: Supabase Cloud PostgreSQL (Data Access Layer với Repositories Pattern & Audit Logs).
+- **Unit Testing**: Node.js Native Test Runner (`node:test` & `node:assert` - 100% Zero Dependency).
+- **Triển Khai (Deployment)**: Render.com Web Service / Background Worker (Vận hành 24/7).
 
 ---
 
@@ -112,3 +72,16 @@ Toàn bộ nhân viên, admin, hợp đồng trả góp và các bài báo cáo 
 | **`/editexpense <ID> <Số_tiền> <Ghi_chú>`** | Sửa khoản chi tiêu (Ví dụ: `/editexpense REP_12345 60k Mua nước đá`). |
 | **`/deletereport <ID>`** | Xóa hoàn toàn 1 lượt báo cáo bị nhập sai hoặc trùng lặp. |
 | **`/deleteragop <INS_ID>`** | Xóa 1 hợp đồng mua trả góp nếu nhập sai. |
+
+---
+
+## 🧪 Kiểm Thử Hệ Thống (Unit Testing)
+
+Chạy bộ unit test tích hợp sẵn của Node.js:
+```bash
+npm test
+```
+- Kiểm tra quản lý bản nháp (Draft Store & Pending Edit State).
+- Kiểm tra tạo bàn phím menu Sửa Nhanh & bản Copyable Text.
+- Kiểm tra logic bóc tách Hybrid OCR & Google Cloud Vision API.
+- Kiểm tra định dạng tin nhắn xem trước & cảnh báo an toàn.
