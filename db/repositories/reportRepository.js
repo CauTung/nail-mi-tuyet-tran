@@ -330,6 +330,29 @@ async function updateExpense(reportId, amount, notes) {
 }
 
 async function getDailyReports(dateStr) {
+  if (isSupabaseConnected()) {
+    try {
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .eq("report_date", dateStr)
+        .or("status.is.null,status.neq.overwritten")
+        .order("created_at", { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data.map(row => ({
+          id: row.id,
+          date: row.report_date,
+          user_info: row.user_info,
+          input_type: row.input_type,
+          parsed_result: row.raw_data
+        }));
+      }
+    } catch (err) {
+      console.error("Lỗi lấy báo cáo ngày từ Supabase:", err);
+    }
+  }
+
   ensureLocalDirs();
   const [year, month] = dateStr.split("-");
   const yearMonth = `${year}-${month}`;
@@ -345,6 +368,32 @@ async function getDailyReports(dateStr) {
 }
 
 async function getMonthlyReportsList(yearMonth) {
+  if (isSupabaseConnected()) {
+    try {
+      const startDate = `${yearMonth}-01`;
+      const endDate = `${yearMonth}-31`;
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .gte("report_date", startDate)
+        .lte("report_date", endDate)
+        .or("status.is.null,status.neq.overwritten")
+        .order("report_date", { ascending: true });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data.map(row => ({
+          id: row.id,
+          date: row.report_date,
+          user_info: row.user_info,
+          input_type: row.input_type,
+          parsed_result: row.raw_data
+        }));
+      }
+    } catch (err) {
+      console.error("Lỗi lấy báo cáo tháng từ Supabase:", err);
+    }
+  }
+
   ensureLocalDirs();
   const monthFolder = path.join(REPORTS_DIR, yearMonth);
   if (!fs.existsSync(monthFolder)) return [];
