@@ -223,8 +223,23 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
         warnings.push(`💰 Doanh số thợ **"${staffName}"** cao bất thường (${new Intl.NumberFormat("vi-VN").format(total)}đ > 5 triệu).`);
       }
 
+      let breakdownParts = [];
+      if (s.revenue && typeof s.revenue === "object") {
+        Object.entries(s.revenue).forEach(([k, val]) => {
+          const num = Number(val) || 0;
+          if (num > 0) {
+            breakdownParts.push(`${k} ${new Intl.NumberFormat("vi-VN").format(num)}đ`);
+          }
+        });
+      } else {
+        if (s.goi_mong > 0) breakdownParts.push(`Gội/Móng ${new Intl.NumberFormat("vi-VN").format(s.goi_mong)}đ`);
+        if (s.mi > 0) breakdownParts.push(`Mi/Xăm ${new Intl.NumberFormat("vi-VN").format(s.mi)}đ`);
+        if (s.ngoai_gio > 0) breakdownParts.push(`Ngoài giờ ${new Intl.NumberFormat("vi-VN").format(s.ngoai_gio)}đ`);
+      }
+
+      const breakdownStr = breakdownParts.length > 0 ? ` *(${breakdownParts.join(", ")})*` : "";
       const unknownTag = s.is_unknown_staff ? " ⚠️ *(Tên mới)*" : "";
-      msg += `• **${staffName}**${unknownTag}: ${new Intl.NumberFormat("vi-VN").format(total)}đ\n`;
+      msg += `• **${staffName}**${unknownTag}: **${new Intl.NumberFormat("vi-VN").format(total)}đ**${breakdownStr}\n`;
     });
     msg += `\n`;
   }
