@@ -250,6 +250,94 @@ async function handleMau(ctx) {
   return ctx.reply(msg, { parse_mode: "Markdown" });
 }
 
+async function handleMigrate(ctx) {
+  const { supabase, isSupabaseConnected } = require("../../config/supabase");
+  const fs = require("fs");
+  const path = require("path");
+
+  if (!isSupabaseConnected()) {
+    return ctx.reply("❌ Chưa kết nối CSDL Supabase! Kiểm tra lại SUPABASE_KEY trong .env", { parse_mode: "Markdown" });
+  }
+
+  const DATA_DIR = path.join(__dirname, "../../data");
+  const REPORTS_DIR = path.join(DATA_DIR, "reports");
+
+  if (!fs.existsSync(REPORTS_DIR)) {
+    return ctx.reply("ℹ️ Không tìm thấy thư mục báo cáo local nào để đồng bộ.", { parse_mode: "Markdown" });
+  }
+
+  const statusMsg = await ctx.reply("⏳ *Bot đang bắt đầu đồng bộ toàn bộ file JSON báo cáo local trên Render lên Supabase Database...*", { parse_mode: "Markdown" });
+
+  try {
+    let reportCount = 0;
+    const months = fs.readdirSync(REPORTS_DIR);
+
+    for (const ym of months) {
+      const monthPath = path.join(REPORTS_DIR, ym);
+      if (fs.statSync(monthPath).isDirectory()) {
+        const files = fs.readdirSync(monthPath).filter(f => f.endsWith(".json"));
+        for (const file of files) {
+          const filePath = path.join(monthPath, file);
+          try {
+            const reports = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+            for (const r of reports) {
+              reportCount++;
+              const dateStr = r.date || file.replace(".json", "");
+
+              await supabase.from("reports").upsert({
+                id: r.id,
+                report_date: dateStr,
+                user_info: r.user_info || null,
+                input_type: r.input_type || "text",
+                raw_data: r.parsed_result || null,
+                created_at: r.timestamp || new Date().toISOString(),
+                status: "active"
+              }, { onConflict: "id" });
+
+              const parsed = r.parsed_result || {};
+
+              if (Array.isArray(parsed.staff_data)) {
+                for (const s of parsed.staff_data) {
+                  await supabase.from("report_staff_revenue").insert({
+                    report_id: r.id,
+                    report_date: dateStr,
+                    staff_name: s.name,
+                    is_unknown_staff: s.is_unknown_staff || false,
+                    attendance_description: s.attendance_description || "Làm cả ngày",
+                    attendance_score: s.attendance_score !== undefined ? s.attendance_score : 1.0,
+                    late_minutes: Number(s.late_minutes) || 0,
+                    goi_mong: s.revenue?.goi_mong || 0,
+                    mi: s.revenue?.mi || 0,
+                    ngoai_gio: s.revenue?.ngoai_gio || 0
+                  }).catch(() => {});
+                }
+              }
+
+              if (Array.isArray(parsed.expenses_data)) {
+                for (const exp of parsed.expenses_data) {
+                  await supabase.from("report_expenses").insert({
+                    report_id: r.id,
+                    report_date: dateStr,
+                    category: exp.category || "Chi phí",
+                    amount: exp.amount || 0,
+                    notes: exp.notes || ""
+                  }).catch(() => {});
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch(e){}
+    return ctx.reply(`🎉 **ĐÃ ĐỒNG BỘ THÀNH CÔNG ${reportCount} LƯỢT BÁO CÁO TỪ JSON LÊN SUPABASE DATABASE!**\nBây giờ bạn mở Supabase ra xem sẽ thấy đầy đủ dữ liệu!`, { parse_mode: "Markdown" });
+  } catch (err) {
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch(e){}
+    return ctx.reply(`❌ **Đồng bộ thất bại:** ${err.message}`, { parse_mode: "Markdown" });
+  }
+}
+
 module.exports = {
   handleSetAdmin,
   handleStaff,
@@ -264,5 +352,6 @@ module.exports = {
   handleEditExpense,
   handleDeleteReport,
   handleDeleteRagop,
-  handleMau
+  handleMau,
+  handleMigrate
 };

@@ -77,10 +77,10 @@ function createBotApp() {
   bot.command("addcategory", adminOnlyMiddleware, adminHandler.handleAddCategory);
   bot.command("delcategory", adminOnlyMiddleware, adminHandler.handleDelCategory);
   bot.command("setcommission", adminOnlyMiddleware, adminHandler.handleSetCommission);
-  bot.command("editrevenue", adminOnlyMiddleware, adminHandler.handleEditRevenue);
   bot.command("editexpense", adminOnlyMiddleware, adminHandler.handleEditExpense);
   bot.command("deletereport", adminOnlyMiddleware, adminHandler.handleDeleteReport);
   bot.command("deleteragop", adminOnlyMiddleware, adminHandler.handleDeleteRagop);
+  bot.command("migrate", adminOnlyMiddleware, adminHandler.handleMigrate);
 
   // Inline Keyboards Callback Router
   bot.on("callback_query", confirmHandler.handleCallbackQuery);
