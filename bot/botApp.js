@@ -14,6 +14,20 @@ function createBotApp() {
 
   const bot = new Telegraf(env.telegramToken);
 
+  // Global Error Handler for Telegraf (Bẫy lỗi toàn cục)
+  bot.catch(async (err, ctx) => {
+    console.error(`🚨 [BOT GLOBAL ERROR] Lỗi tại update (${ctx.updateType}):`, err);
+    try {
+      if (ctx.callbackQuery) {
+        await ctx.answerCbQuery("❌ Đã có lỗi hệ thống xảy ra!").catch(() => {});
+      }
+      const errMsg = `🚨 **ĐÃ CÓ LỖI HỆ THỐNG XẢY RA!**\nChi tiết lỗi: \`${err.message || "Lỗi không xác định"}\`\n*Hệ thống đã tự ghi vết log để khắc phục.*`;
+      await ctx.reply(errMsg, { parse_mode: "Markdown" }).catch(() => {});
+    } catch (e) {
+      console.error("Lỗi khi gửi thông báo bot.catch:", e);
+    }
+  });
+
   // Kích hoạt lịch nhắc nhở 20:00 hàng ngày
   reminderService.initDailyReminder(bot);
 
