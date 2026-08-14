@@ -135,7 +135,7 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
   // Supabase saving
   if (isSupabaseConnected()) {
     try {
-      await supabase.from("reports").insert({
+      const { error: insErr } = await supabase.from("reports").insert({
         id: reportId,
         report_date: targetDate,
         user_info: metaInfo.userInfo || null,
@@ -143,6 +143,12 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
         raw_data: reportData,
         created_at: now.toISOString()
       });
+
+      if (insErr) {
+        console.error(`❌ [SUPABASE ERROR] Lỗi ghi báo cáo ngày ${targetDate}:`, insErr.message);
+      } else {
+        console.log(`✅ [SUPABASE] Đã chốt lưu báo cáo thành công (ID: ${reportId}, Ngày: ${targetDate})`);
+      }
 
       // Ghi log lịch sử ocr_logs
       await supabase.from("ocr_logs").insert({
@@ -182,7 +188,7 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
         await supabase.from("report_expenses").insert(expRows);
       }
     } catch (err) {
-      console.error("Lỗi ghi báo cáo vào Supabase:", err);
+      console.error("❌ Lỗi ngoại lệ khi ghi báo cáo vào Supabase:", err.message);
     }
   }
 
@@ -394,20 +400,25 @@ async function getDailyReports(dateStr) {
         .from("reports")
         .select("*")
         .eq("report_date", dateStr)
-        .or("status.is.null,status.neq.overwritten")
         .order("created_at", { ascending: false });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return data.map(row => ({
-          id: row.id,
-          date: row.report_date,
-          user_info: row.user_info,
-          input_type: row.input_type,
-          parsed_result: row.raw_data
-        }));
+      if (error) {
+        console.error(`⚠️ [SUPABASE ERROR] Lỗi truy vấn báo cáo ngày ${dateStr}:`, error.message);
+      } else if (Array.isArray(data)) {
+        const activeReports = data.filter(row => !row.status || row.status !== "overwritten");
+        console.log(`📊 [SUPABASE] Tìm thấy ${activeReports.length}/${data.length} báo cáo hợp lệ cho ngày ${dateStr}`);
+        if (activeReports.length > 0) {
+          return activeReports.map(row => ({
+            id: row.id,
+            date: row.report_date,
+            user_info: row.user_info,
+            input_type: row.input_type,
+            parsed_result: row.raw_data
+          }));
+        }
       }
     } catch (err) {
-      console.error("Lỗi lấy báo cáo ngày từ Supabase:", err);
+      console.error("❌ Lỗi kết nối Supabase khi lấy báo cáo ngày:", err.message);
     }
   }
 
@@ -438,20 +449,25 @@ async function getMonthlyReportsList(yearMonth) {
         .select("*")
         .gte("report_date", startDate)
         .lte("report_date", endDate)
-        .or("status.is.null,status.neq.overwritten")
         .order("report_date", { ascending: true });
 
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return data.map(row => ({
-          id: row.id,
-          date: row.report_date,
-          user_info: row.user_info,
-          input_type: row.input_type,
-          parsed_result: row.raw_data
-        }));
+      if (error) {
+        console.error(`⚠️ [SUPABASE ERROR] Lỗi truy vấn báo cáo tháng ${yearMonth}:`, error.message);
+      } else if (Array.isArray(data)) {
+        const activeReports = data.filter(row => !row.status || row.status !== "overwritten");
+        console.log(`📊 [SUPABASE] Tìm thấy ${activeReports.length}/${data.length} báo cáo hợp lệ cho tháng ${yearMonth}`);
+        if (activeReports.length > 0) {
+          return activeReports.map(row => ({
+            id: row.id,
+            date: row.report_date,
+            user_info: row.user_info,
+            input_type: row.input_type,
+            parsed_result: row.raw_data
+          }));
+        }
       }
     } catch (err) {
-      console.error("Lỗi lấy báo cáo tháng từ Supabase:", err);
+      console.error("❌ Lỗi kết nối Supabase khi lấy báo cáo tháng:", err.message);
     }
   }
 
