@@ -81,8 +81,11 @@ async function getDailySummary(dateStr) {
 }
 
 async function getMonthlySummary(yearMonth) {
-  const reports = await reportRepo.getMonthlyReportsList(yearMonth);
-  const commissionConfig = await configRepo.getCommissionConfig();
+  const [reports, commissionConfig, activeInstallments] = await Promise.all([
+    reportRepo.getMonthlyReportsList(yearMonth),
+    configRepo.getCommissionConfig(),
+    installmentRepo.getActiveInstallmentsForMonth(yearMonth)
+  ]);
 
   let totalRevenueGoiMong = 0;
   let totalRevenueMi = 0;
@@ -171,11 +174,12 @@ async function getMonthlySummary(yearMonth) {
     }
   });
 
-  const activeInstallments = await installmentRepo.getActiveInstallmentsForMonth(yearMonth);
   let totalInstallmentExpenses = 0;
-  activeInstallments.forEach(ins => {
-    totalInstallmentExpenses += ins.monthly_amount;
-  });
+  if (Array.isArray(activeInstallments)) {
+    activeInstallments.forEach(ins => {
+      totalInstallmentExpenses += (ins.monthly_amount || 0);
+    });
+  }
 
   const totalRevenueAll = totalRevenueGoiMong + totalRevenueMi + totalRevenueNgoaiGio;
   const totalAllExpenses = totalDirectExpenses + totalInstallmentExpenses;

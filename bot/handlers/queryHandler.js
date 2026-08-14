@@ -44,28 +44,39 @@ async function handleMonth(ctx) {
     yearMonth = currentYM;
   }
 
-  const summary = await financialService.getMonthlySummary(yearMonth);
-  if (!summary || summary.daysCount === 0) {
-    return ctx.reply(`📅 **BÁO CÁO THÁNG ${yearMonth}:**\nChưa có dữ liệu báo cáo nào cho tháng này.`, { parse_mode: "Markdown" });
+  const statusMsg = await ctx.reply(`📊 *Bot đang tổng hợp báo cáo tháng ${yearMonth}... Vui lòng đợi trong giây lát!*`, {
+    parse_mode: "Markdown"
+  });
+
+  try {
+    const summary = await financialService.getMonthlySummary(yearMonth);
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+
+    if (!summary || summary.daysCount === 0) {
+      return ctx.reply(`📅 **BÁO CÁO THÁNG ${yearMonth}:**\nChưa có dữ liệu báo cáo nào cho tháng này.`, { parse_mode: "Markdown" });
+    }
+
+    let msg = `📅 **BÁO CÁO TỔNG HỢP THÁNG ${yearMonth}**\n`;
+    msg += `📆 Số ngày có báo cáo: **${summary.daysCount} ngày** (${summary.totalReportsCount} lượt)\n\n`;
+
+    msg += `💵 **DOANH THU:**\n`;
+    msg += `• Gội/Móng: ${formatMoney(summary.revenue.goi_mong)}\n`;
+    msg += `• Mi/Phun xăm: ${formatMoney(summary.revenue.mi)}\n`;
+    msg += `• Tăng ca: ${formatMoney(summary.revenue.ngoai_gio)}\n`;
+    msg += `➔ **Tổng Doanh Thu:** **${formatMoney(summary.revenue.total)}**\n\n`;
+
+    msg += `📉 **CHI TIẾT CHI PHÍ:**\n`;
+    msg += `• Chi tiêu trực tiếp: ${formatMoney(summary.expenses.direct)}\n`;
+    msg += `• Tiền trả góp tháng này: ${formatMoney(summary.expenses.installments)}\n`;
+    msg += `➔ **Tổng Chi Phí:** **${formatMoney(summary.expenses.total)}**\n\n`;
+
+    msg += `🏆 **LỢI NHUẬN RÒNG THÁNG:** **${formatMoney(summary.netProfit)}**\n`;
+
+    return ctx.reply(msg, { parse_mode: "Markdown" });
+  } catch (err) {
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+    return ctx.reply(`❌ **Không thể tổng hợp báo cáo tháng ${yearMonth}:** ${err.message}`, { parse_mode: "Markdown" });
   }
-
-  let msg = `📅 **BÁO CÁO TỔNG HỢP THÁNG ${yearMonth}**\n`;
-  msg += `📆 Số ngày có báo cáo: **${summary.daysCount} ngày** (${summary.totalReportsCount} lượt)\n\n`;
-
-  msg += `💵 **DOANH THU:**\n`;
-  msg += `• Gội/Móng: ${formatMoney(summary.revenue.goi_mong)}\n`;
-  msg += `• Mi/Phun xăm: ${formatMoney(summary.revenue.mi)}\n`;
-  msg += `• Tăng ca: ${formatMoney(summary.revenue.ngoai_gio)}\n`;
-  msg += `➔ **Tổng Doanh Thu:** **${formatMoney(summary.revenue.total)}**\n\n`;
-
-  msg += `📉 **CHI TIẾT CHI PHÍ:**\n`;
-  msg += `• Chi tiêu trực tiếp: ${formatMoney(summary.expenses.direct)}\n`;
-  msg += `• Tiền trả góp tháng này: ${formatMoney(summary.expenses.installments)}\n`;
-  msg += `➔ **Tổng Chi Phí:** **${formatMoney(summary.expenses.total)}**\n\n`;
-
-  msg += `🏆 **LỢI NHUẬN RÒNG THÁNG:** **${formatMoney(summary.netProfit)}**\n`;
-
-  return ctx.reply(msg, { parse_mode: "Markdown" });
 }
 
 async function handleLuong(ctx) {
@@ -78,25 +89,36 @@ async function handleLuong(ctx) {
     yearMonth = currentYM;
   }
 
-  const summary = await financialService.getMonthlySummary(yearMonth);
-  if (!summary || summary.daysCount === 0) {
-    return ctx.reply(`👷‍♀️ **BẢNG LƯƠNG & CÔNG THÁNG ${yearMonth}:**\nChưa có dữ liệu cho tháng này.`, { parse_mode: "Markdown" });
-  }
-
-  const cfg = summary.commissionConfig;
-  let msg = `👷‍♀️ **BẢNG TỔNG HỢP LƯƠNG & CÔNG THÁNG ${yearMonth}**\n`;
-  msg += `⚙️ *(Tỷ lệ %: Gội/Móng ${cfg.goi_mong_percent}%, Mi ${cfg.mi_percent}%, Tăng ca ${cfg.ngoai_gio_percent}%)*\n\n`;
-
-  Object.keys(summary.staffStats).forEach(name => {
-    const st = summary.staffStats[name];
-    msg += `👤 **${name}**:\n`;
-    msg += `• Tong cong score: \`${st.total_score}\` (Làm ${st.days_worked} ngày, Nghỉ ${st.days_off} ngày)\n`;
-    if (st.days_late > 0) msg += `• Đi muộn: ${st.days_late} lần (${st.late_minutes} phút)\n`;
-    msg += `• Doanh số mang về: ${formatMoney(st.total_revenue)}\n`;
-    msg += `➔ **LƯƠNG % HOA HỒNG: ${formatMoney(st.total_commission)}**\n\n`;
+  const statusMsg = await ctx.reply(`👷‍♀️ *Bot đang tính toán bảng lương tháng ${yearMonth}... Vui lòng đợi trong giây lát!*`, {
+    parse_mode: "Markdown"
   });
 
-  return ctx.reply(msg, { parse_mode: "Markdown" });
+  try {
+    const summary = await financialService.getMonthlySummary(yearMonth);
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+
+    if (!summary || summary.daysCount === 0) {
+      return ctx.reply(`👷‍♀️ **BẢNG LƯƠNG & CÔNG THÁNG ${yearMonth}:**\nChưa có dữ liệu cho tháng này.`, { parse_mode: "Markdown" });
+    }
+
+    const cfg = summary.commissionConfig;
+    let msg = `👷‍♀️ **BẢNG TỔNG HỢP LƯƠNG & CÔNG THÁNG ${yearMonth}**\n`;
+    msg += `⚙️ *(Tỷ lệ %: Gội/Móng ${cfg.goi_mong_percent}%, Mi ${cfg.mi_percent}%, Tăng ca ${cfg.ngoai_gio_percent}%)*\n\n`;
+
+    Object.keys(summary.staffStats).forEach(name => {
+      const st = summary.staffStats[name];
+      msg += `👤 **${name}**:\n`;
+      msg += `• Tong cong score: \`${st.total_score}\` (Làm ${st.days_worked} ngày, Nghỉ ${st.days_off} ngày)\n`;
+      if (st.days_late > 0) msg += `• Đi muộn: ${st.days_late} lần (${st.late_minutes} phút)\n`;
+      msg += `• Doanh số mang về: ${formatMoney(st.total_revenue)}\n`;
+      msg += `➔ **LƯƠNG % HOA HỒNG: ${formatMoney(st.total_commission)}**\n\n`;
+    });
+
+    return ctx.reply(msg, { parse_mode: "Markdown" });
+  } catch (err) {
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+    return ctx.reply(`❌ **Không thể tính lương tháng ${yearMonth}:** ${err.message}`, { parse_mode: "Markdown" });
+  }
 }
 
 async function handleExport(ctx) {
@@ -109,17 +131,28 @@ async function handleExport(ctx) {
     yearMonth = currentYM;
   }
 
-  const exportPath = await exportService.exportMonthlyCsv(yearMonth);
-  if (!exportPath) {
-    return ctx.reply(`❌ Không tìm thấy dữ liệu tháng \`${yearMonth}\` để xuất file!`, { parse_mode: "Markdown" });
-  }
-
-  await ctx.replyWithDocument({
-    source: exportPath,
-    filename: `BaoCao_NailMi_TuyetTran_${yearMonth}.csv`
-  }, {
-    caption: `📊 File Excel báo cáo chi tiết tháng **${yearMonth}**`
+  const statusMsg = await ctx.reply(`📊 *Bot đang khởi tạo file báo cáo Excel tháng ${yearMonth}... Vui lòng đợi trong giây lát!*`, {
+    parse_mode: "Markdown"
   });
+
+  try {
+    const exportPath = await exportService.exportMonthlyCsv(yearMonth);
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+
+    if (!exportPath) {
+      return ctx.reply(`❌ Không tìm thấy dữ liệu tháng \`${yearMonth}\` để xuất file!`, { parse_mode: "Markdown" });
+    }
+
+    await ctx.replyWithDocument({
+      source: exportPath,
+      filename: `BaoCao_NailMi_TuyetTran_${yearMonth}.csv`
+    }, {
+      caption: `📊 File Excel báo cáo chi tiết tháng **${yearMonth}**`
+    });
+  } catch (err) {
+    try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
+    return ctx.reply(`❌ **Không thể xuất file báo cáo tháng ${yearMonth}:** ${err.message}`, { parse_mode: "Markdown" });
+  }
 }
 
 async function handleSearch(ctx) {
