@@ -406,7 +406,8 @@ async function handleCallbackQuery(ctx) {
       clearPendingEdit(ctx.from.id);
 
       const calcTotal = (draft.result?.staff_data || []).reduce((acc, s) => acc + getStaffTotalRevenue(s), 0);
-      const successMsg = `✅ **ĐÃ LƯU THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n🆔 Mã báo cáo: \`${saved.record.id}\`\n💰 Tổng doanh thu: **${new Intl.NumberFormat("vi-VN").format(calcTotal)}đ**`;
+      let storageNote = saved.dbSaved ? "\n🗄️ *Trạng thái CSDL:* ✅ Đã lưu vào Supabase Database" : `\n🗄️ *Trạng thái CSDL:* ⚠️ Chỉ lưu file JSON local (${saved.dbError || "Chưa kết nối Supabase"})`;
+      const successMsg = `✅ **ĐÃ LƯU THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n🆔 Mã báo cáo: \`${saved.record.id}\`\n💰 Tổng doanh thu: **${new Intl.NumberFormat("vi-VN").format(calcTotal)}đ**${storageNote}`;
       try {
         await ctx.editMessageText(successMsg, { parse_mode: "Markdown" });
       } catch (e) {
@@ -432,7 +433,8 @@ async function handleCallbackQuery(ctx) {
       deleteDraft(draftId);
       clearPendingEdit(ctx.from.id);
 
-      const successMsg = `🔄 **ĐÃ GHI ĐÈ THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n📦 Bản cũ đã được sao lưu an toàn.\n🆔 Mã báo cáo mới: \`${saved.record.id}\``;
+      let storageNote = saved.dbSaved ? "\n🗄️ *Trạng thái CSDL:* ✅ Đã ghi đè vào Supabase Database" : `\n🗄️ *Trạng thái CSDL:* ⚠️ Chỉ ghi đè file JSON local (${saved.dbError || "Chưa kết nối Supabase"})`;
+      const successMsg = `🔄 **ĐÃ GHI ĐÈ THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n📦 Bản cũ đã được sao lưu an toàn.\n🆔 Mã báo cáo mới: \`${saved.record.id}\`${storageNote}`;
       try {
         await ctx.editMessageText(successMsg, { parse_mode: "Markdown" });
       } catch (e) {

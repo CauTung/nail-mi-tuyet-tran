@@ -132,6 +132,9 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
     await installmentRepo.saveInstallments(reportData.installments_data, yearMonth);
   }
 
+  let dbSaved = false;
+  let dbError = null;
+
   // Supabase saving
   if (isSupabaseConnected()) {
     try {
@@ -145,9 +148,11 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
       });
 
       if (insErr) {
-        console.error(`❌ [SUPABASE ERROR] Lỗi ghi báo cáo ngày ${targetDate}:`, insErr.message);
+        dbError = insErr.message;
+        console.error(`❌ [SUPABASE ERROR] Lỗi ghi báo cáo ngày ${targetDate}: ${insErr.message}`);
       } else {
-        console.log(`✅ [SUPABASE] Đã chốt lưu báo cáo thành công (ID: ${reportId}, Ngày: ${targetDate})`);
+        dbSaved = true;
+        console.log(`✅ [SUPABASE SUCCESS] Đã chốt lưu báo cáo thành công vào Database (ID: ${reportId}, Ngày: ${targetDate})`);
       }
 
       // Ghi log lịch sử ocr_logs
@@ -189,11 +194,14 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
         await supabase.from("report_expenses").insert(expRows);
       }
     } catch (err) {
-      console.error("❌ Lỗi ngoại lệ khi ghi báo cáo vào Supabase:", err.message);
+      dbError = err.message;
+      console.error("❌ [SUPABASE EXCEPTION] Lỗi ngoại lệ khi ghi báo cáo vào Supabase:", err.message);
     }
+  } else {
+    console.warn("⚠️ [STORAGE WARN] Supabase chưa kết nối. Báo cáo chỉ được lưu dưới dạng file JSON local.");
   }
 
-  return { record, filePath: dailyFile, dateStr: targetDate };
+  return { record, filePath: dailyFile, dateStr: targetDate, dbSaved, dbError };
 }
 
 async function deleteReport(reportId) {

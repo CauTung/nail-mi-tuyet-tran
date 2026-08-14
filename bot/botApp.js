@@ -62,6 +62,7 @@ function createBotApp() {
   bot.command("addpast", queryHandler.handleAddPast);
   bot.command("history", queryHandler.handleHistory);
   bot.command("restore", adminOnlyMiddleware, queryHandler.handleRestore);
+  bot.command(["dbstatus", "status"], queryHandler.handleDbStatus);
   bot.command(["mau", "template"], adminHandler.handleMau);
 
   // Registration for Admin

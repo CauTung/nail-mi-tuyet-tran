@@ -304,6 +304,66 @@ async function handleRestore(ctx) {
   }
 }
 
+async function handleDbStatus(ctx) {
+  const { supabase, isSupabaseConnected } = require("../../config/supabase");
+  const env = require("../../config/env");
+
+  let msg = `🗄️ **KIỂM TRA TRẠNG THÁI CƠ SỞ DỮ LIỆU (DATABASE STATUS)**\n`;
+  msg += `------------------------------------\n`;
+
+  if (!isSupabaseConnected()) {
+    msg += `❌ **Supabase Connection:** CHƯA KẾT NỐI (Thiếu SUPABASE_URL hoặc SUPABASE_KEY trong .env)\n`;
+    msg += `📁 **Lưu trữ hiện tại:** 100% File JSON local trên Server.\n`;
+    return ctx.reply(msg, { parse_mode: "Markdown" });
+  }
+
+  msg += `⚡ **Target Supabase URL:** \`${env.supabaseUrl}\`\n`;
+
+  try {
+    const { data: repData, error: repErr, count } = await supabase
+      .from("reports")
+      .select("id, report_date", { count: "exact", head: false })
+      .limit(5);
+
+    if (repErr) {
+      msg += `❌ **Supabase Query Error:** \`${repErr.message}\` (Mã: \`${repErr.code || "UNKNOWN"}\`)\n`;
+      if (repErr.code === "42501" || repErr.message.includes("policy")) {
+        msg += `⚠️ **Nguyên nhân:** Bị chặn bởi RLS (Row Level Security) trên Supabase. Vui lòng tắt RLS hoặc dùng Service Role Key.\n`;
+      }
+    } else {
+      msg += `✅ **Trạng thái đọc CSDL:** HOẠT ĐỘNG BÌNH THƯỜNG\n`;
+      msg += `📊 **Tổng số báo cáo trong Supabase \`reports\`:** **${count !== null ? count : (repData ? repData.length : 0)}** dòng\n`;
+      if (repData && repData.length > 0) {
+        msg += `📝 **Các báo cáo mới nhất:** ${repData.map(r => `\`${r.report_date}\``).join(", ")}\n`;
+      }
+    }
+
+    // Test write permission
+    const testId = `TEST_PING_${Date.now()}`;
+    const { error: testErr } = await supabase.from("ocr_logs").insert({
+      log_id: testId,
+      input_type: "ping_test",
+      raw_data: { test: true },
+      created_at: new Date().toISOString()
+    });
+
+    if (testErr) {
+      msg += `❌ **Quyền ghi (Insert):** BỊ LỖI (\`${testErr.message}\`)\n`;
+    } else {
+      msg += `✅ **Quyền ghi (Insert):** THÀNH CÔNG (Đã ghi test log vào \`ocr_logs\`)\n`;
+      // Clean up test ping
+      await supabase.from("ocr_logs").delete().eq("log_id", testId).catch(() => {});
+    }
+  } catch (err) {
+    msg += `❌ **Lỗi ngoại lệ Supabase:** \`${err.message}\`\n`;
+  }
+
+  msg += `------------------------------------\n`;
+  msg += `📁 **Lưu trữ local JSON:** LUÔN BẬT (Dự phòng offline khi mất mạng CSDL)\n`;
+
+  return ctx.reply(msg, { parse_mode: "Markdown" });
+}
+
 module.exports = {
   handleToday,
   handleMonth,
@@ -314,5 +374,6 @@ module.exports = {
   handleMyId,
   handleAddPast,
   handleHistory,
-  handleRestore
+  handleRestore,
+  handleDbStatus
 };
