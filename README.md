@@ -42,6 +42,35 @@ Bot giải quyết triệt để bài toán bóc tách dữ liệu từ sổ tay
 
 ---
 
+## 🔑 Hướng Dẫn Lấy Các API Key & Cấu Hình Môi Trường (.env)
+
+Tạo file `.env` từ file mẫu `.env.example` và điền các thông số sau:
+
+### 1. `TELEGRAM_BOT_TOKEN` (Token Bot Telegram)
+1. Mở ứng dụng Telegram, tìm kiếm bot **`@BotFather`**.
+2. Gõ lệnh `/newbot` và làm theo hướng dẫn (đặt tên cho Bot và chọn username kết thúc bằng `_bot`).
+3. Sao chép chuỗi **HTTP API Token** nhận được (Ví dụ: `8769874074:AAFvOTWWCpAZ...`).
+
+### 2. `GEMINI_API_KEY` & `GOOGLE_VISION_API_KEY` (Google AI & Vision OCR Key)
+1. Truy cập **Google AI Studio**: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey).
+2. Đăng nhập tài khoản Google ➔ Nhấn **Create API key** ➔ Sao chép mã API Key được cấp.
+3. *(Tùy chọn cho Hybrid OCR)*: Trong [Google Cloud Console](https://console.cloud.google.com/apis/library/vision.googleapis.com), tìm kiếm **Cloud Vision API** và nhấn **Enable** cho dự án tương ứng. (Mã API Key từ Google AI Studio có thể dùng chung cho cả Gemini LLM và Google Cloud Vision OCR).
+
+### 3. `ADMIN_USER_IDS` (ID Telegram Chủ Tiệm / Admin)
+1. Mở Telegram, tìm kiếm bot **`@userinfobot`** ➔ Gõ `/start`.
+2. Sao chép dãy số `Id` cá nhân của bạn (Ví dụ: `5732312905`).
+3. Nếu tiệm có nhiều Admin/Chủ tiệm, điền các ID phân cách bởi dấu phẩy: `5732312905,987654321`.
+
+### 4. `SUPABASE_URL` & `SUPABASE_KEY` (Cơ Sở Dữ Liệu Cloud)
+1. Truy cập [https://supabase.com/](https://supabase.com/) ➔ Đăng ký/Đăng nhập ➔ Chọn **New Project**.
+2. Sau khi khởi tạo dự án, vào menu **Project Settings** bên dưới góc trái ➔ chọn mục **API**.
+3. Sao chép 2 thông số:
+   - **Project URL**: Gán cho `SUPABASE_URL`
+   - **anon public key**: Gán cho `SUPABASE_KEY`
+4. Vào mục **SQL Editor** trên Supabase ➔ Mở file [`db/schema.sql`](file:///var/www/html/tuyet-tran/db/schema.sql) trong dự án ➔ Copy toàn bộ mã SQL dán vào và nhấn **RUN** để khởi tạo các bảng dữ liệu.
+
+---
+
 ## 📖 Bảng Tra Cứu Lệnh Telegram
 
 ### 📊 Lệnh Tra Cứu Báo Cáo & Tài Chính
