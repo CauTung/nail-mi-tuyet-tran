@@ -29,6 +29,14 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
   const now = new Date();
   let targetDate = explicitDate || reportData.report_date;
 
+  if (targetDate && /^\d{4}-\d{1,2}-\d{1,2}$/.test(targetDate)) {
+    const parts = targetDate.split("-");
+    const y = parts[0];
+    const m = parts[1].padStart(2, "0");
+    const d = parts[2].padStart(2, "0");
+    targetDate = `${y}-${m}-${d}`;
+  }
+
   if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
     const { dateStr } = getDateKeys(now);
     targetDate = dateStr;
@@ -234,6 +242,38 @@ async function updateStaffRevenue(reportId, staffName, goiMong, mi, ngoaiGio) {
         if (ngoaiGio !== undefined && ngoaiGio !== null) updateData.ngoai_gio = Number(ngoaiGio);
         await supabase.from("report_staff_revenue").update(updateData).eq("id", staffRow.id);
       }
+
+      const { data: repRow } = await supabase
+        .from("reports")
+        .select("raw_data")
+        .eq("id", reportId)
+        .maybeSingle();
+
+      if (repRow && repRow.raw_data) {
+        const rawData = { ...repRow.raw_data };
+        if (!Array.isArray(rawData.staff_data)) rawData.staff_data = [];
+        let staffObj = rawData.staff_data.find(s => (s.name || "").toLowerCase() === staffName.toLowerCase());
+        if (!staffObj) {
+          staffObj = { name: staffName, revenue: { goi_mong: 0, mi: 0, ngoai_gio: 0 } };
+          rawData.staff_data.push(staffObj);
+        }
+        if (!staffObj.revenue || typeof staffObj.revenue !== "object") {
+          staffObj.revenue = {};
+        }
+        if (goiMong !== undefined && goiMong !== null) {
+          staffObj.revenue.goi_mong = Number(goiMong);
+          staffObj.goi_mong = Number(goiMong);
+        }
+        if (mi !== undefined && mi !== null) {
+          staffObj.revenue.mi = Number(mi);
+          staffObj.mi = Number(mi);
+        }
+        if (ngoaiGio !== undefined && ngoaiGio !== null) {
+          staffObj.revenue.ngoai_gio = Number(ngoaiGio);
+          staffObj.ngoai_gio = Number(ngoaiGio);
+        }
+        await supabase.from("reports").update({ raw_data: rawData }).eq("id", reportId);
+      }
     } catch (err) {
       console.error("Lỗi cập nhật doanh số nhân viên Supabase:", err);
     }
@@ -291,6 +331,24 @@ async function updateExpense(reportId, amount, notes) {
         amount: Number(amount),
         notes: notes || "Đã điều chỉnh chi tiêu"
       });
+
+      const { data: repRow } = await supabase
+        .from("reports")
+        .select("raw_data")
+        .eq("id", reportId)
+        .maybeSingle();
+
+      if (repRow && repRow.raw_data) {
+        const rawData = { ...repRow.raw_data };
+        rawData.expenses_data = [
+          {
+            category: "Chi phí điều chỉnh",
+            amount: Number(amount),
+            notes: notes || "Đã điều chỉnh chi tiêu"
+          }
+        ];
+        await supabase.from("reports").update({ raw_data: rawData }).eq("id", reportId);
+      }
     } catch (err) {
       console.error("Lỗi cập nhật chi tiêu Supabase:", err);
     }
@@ -370,8 +428,11 @@ async function getDailyReports(dateStr) {
 async function getMonthlyReportsList(yearMonth) {
   if (isSupabaseConnected()) {
     try {
+      const [y, m] = yearMonth.split("-").map(Number);
       const startDate = `${yearMonth}-01`;
-      const endDate = `${yearMonth}-31`;
+      const lastDay = new Date(y, m, 0).getDate();
+      const endDate = `${yearMonth}-${String(lastDay).padStart(2, "0")}`;
+
       const { data, error } = await supabase
         .from("reports")
         .select("*")

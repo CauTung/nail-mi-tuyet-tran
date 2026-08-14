@@ -87,3 +87,30 @@ test("Format Copyable Text", () => {
   assert.match(copyText, /Gội\/Móng 200\.000đ/);
   assert.match(copyText, /Đá lạnh: 30\.000đ/);
 });
+
+test("Draft Timers - Reminder & Auto Confirm Flow", async () => {
+  confirmHandler.setTimerDurationsForTesting(50, 150);
+
+  let sentMessages = [];
+  const fakeTelegram = {
+    sendMessage: async (chatId, text) => {
+      sentMessages.push({ chatId, text });
+    }
+  };
+
+  const sampleResult = { status: "success", report_date: "2026-09-02", staff_data: [] };
+  const draftId = confirmHandler.saveDraft(sampleResult, { inputType: "text" }, { telegram: fakeTelegram, chatId: 12345 });
+
+  // Wait 80ms for reminder to trigger
+  await new Promise(r => setTimeout(r, 80));
+  assert.strictEqual(sentMessages.length, 1);
+  assert.match(sentMessages[0].text, /NHẮC NHỞ CHỐT BÁO CÁO/);
+
+  // Wait 100ms more for auto confirm to trigger
+  await new Promise(r => setTimeout(r, 100));
+  assert.strictEqual(sentMessages.length, 2);
+  assert.match(sentMessages[1].text, /TỰ ĐỘNG CHỐT LƯU BÁO CÁO/);
+
+  // Draft should be cleaned up after auto-save
+  assert.strictEqual(confirmHandler.getDraft(draftId), undefined);
+});

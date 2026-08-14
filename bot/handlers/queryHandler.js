@@ -6,6 +6,8 @@ const adminRepo = require("../../db/repositories/adminRepository");
 const aiService = require("../../services/aiService");
 const staffRepo = require("../../db/repositories/staffRepository");
 
+const chartService = require("../../services/chartService");
+
 function formatMoney(amount) {
   return new Intl.NumberFormat("vi-VN").format(amount || 0) + "đ";
 }
@@ -60,9 +62,11 @@ async function handleMonth(ctx) {
     msg += `📆 Số ngày có báo cáo: **${summary.daysCount} ngày** (${summary.totalReportsCount} lượt)\n\n`;
 
     msg += `💵 **DOANH THU:**\n`;
-    msg += `• Gội/Móng: ${formatMoney(summary.revenue.goi_mong)}\n`;
-    msg += `• Mi/Phun xăm: ${formatMoney(summary.revenue.mi)}\n`;
-    msg += `• Tăng ca: ${formatMoney(summary.revenue.ngoai_gio)}\n`;
+    const categories = summary.categories || [];
+    categories.forEach(cat => {
+      const amt = summary.revenue[cat.key] || 0;
+      msg += `• ${cat.label}: ${formatMoney(amt)}\n`;
+    });
     msg += `➔ **Tổng Doanh Thu:** **${formatMoney(summary.revenue.total)}**\n\n`;
 
     msg += `📉 **CHI TIẾT CHI PHÍ:**\n`;
@@ -71,6 +75,15 @@ async function handleMonth(ctx) {
     msg += `➔ **Tổng Chi Phí:** **${formatMoney(summary.expenses.total)}**\n\n`;
 
     msg += `🏆 **LỢI NHUẬN RÒNG THÁNG:** **${formatMoney(summary.netProfit)}**\n`;
+
+    const chartUrl = chartService.generateMonthlyChartUrl(summary);
+    if (chartUrl) {
+      try {
+        return await ctx.replyWithPhoto(chartUrl, { caption: msg, parse_mode: "Markdown" });
+      } catch (chartErr) {
+        console.warn("⚠️ Lỗi khi gửi ảnh biểu đồ QuickChart:", chartErr.message);
+      }
+    }
 
     return ctx.reply(msg, { parse_mode: "Markdown" });
   } catch (err) {
@@ -101,9 +114,10 @@ async function handleLuong(ctx) {
       return ctx.reply(`👷‍♀️ **BẢNG LƯƠNG & CÔNG THÁNG ${yearMonth}:**\nChưa có dữ liệu cho tháng này.`, { parse_mode: "Markdown" });
     }
 
-    const cfg = summary.commissionConfig;
+    const categories = summary.categories || [];
+    const cfgStr = categories.map(c => `${c.label} ${c.percent}%`).join(", ");
     let msg = `👷‍♀️ **BẢNG TỔNG HỢP LƯƠNG & CÔNG THÁNG ${yearMonth}**\n`;
-    msg += `⚙️ *(Tỷ lệ %: Gội/Móng ${cfg.goi_mong_percent}%, Mi ${cfg.mi_percent}%, Tăng ca ${cfg.ngoai_gio_percent}%)*\n\n`;
+    msg += `⚙️ *(Tỷ lệ %: ${cfgStr})*\n\n`;
 
     Object.keys(summary.staffStats).forEach(name => {
       const st = summary.staffStats[name];

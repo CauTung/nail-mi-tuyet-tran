@@ -3,12 +3,17 @@ const configRepo = require("../db/repositories/configRepository");
 const installmentRepo = require("../db/repositories/installmentRepository");
 
 async function getDailySummary(dateStr) {
-  const reports = await reportRepo.getDailyReports(dateStr);
+  const [reports, commissionConfig] = await Promise.all([
+    reportRepo.getDailyReports(dateStr),
+    configRepo.getCommissionConfig()
+  ]);
+
   if (!reports || reports.length === 0) return null;
 
-  let totalGoiMong = 0;
-  let totalMi = 0;
-  let totalNgoaiGio = 0;
+  const categories = commissionConfig.categories || configRepo.DEFAULT_CATEGORIES;
+  const categoryTotals = {};
+  categories.forEach(c => { categoryTotals[c.key] = 0; });
+
   let totalExpenses = 0;
   const staffStats = {};
   const expensesList = [];
@@ -18,21 +23,36 @@ async function getDailySummary(dateStr) {
     const parsed = r.parsed_result || {};
     if (Array.isArray(parsed.staff_data)) {
       parsed.staff_data.forEach(s => {
-        const gm = s.revenue?.goi_mong || 0;
-        const mi = s.revenue?.mi || 0;
-        const ng = s.revenue?.ngoai_gio || 0;
-        totalGoiMong += gm;
-        totalMi += mi;
-        totalNgoaiGio += ng;
-
         if (!staffStats[s.name]) {
-          staffStats[s.name] = { score: 0, goi_mong: 0, mi: 0, ngoai_gio: 0, total: 0 };
+          staffStats[s.name] = { 
+            score: 0, 
+            goi_mong: 0, 
+            mi: 0, 
+            ngoai_gio: 0, 
+            total: 0,
+            categoryTotals: {} 
+          };
+          categories.forEach(c => { staffStats[s.name].categoryTotals[c.key] = 0; });
         }
         staffStats[s.name].score += (s.attendance_score || 0);
-        staffStats[s.name].goi_mong += gm;
-        staffStats[s.name].mi += mi;
-        staffStats[s.name].ngoai_gio += ng;
-        staffStats[s.name].total += (gm + mi + ng);
+
+        categories.forEach(cat => {
+          let val = 0;
+          if (typeof s.revenue === "object" && s.revenue !== null) {
+            val = Number(s.revenue[cat.key]) || 0;
+          }
+          if (!val && cat.key === "goi_mong") val = Number(s.goi_mong || s.goi || 0);
+          if (!val && cat.key === "mi") val = Number(s.mi || s.xam || 0);
+          if (!val && cat.key === "ngoai_gio") val = Number(s.ngoai_gio || s.tang_ca || 0);
+
+          categoryTotals[cat.key] = (categoryTotals[cat.key] || 0) + val;
+          staffStats[s.name].categoryTotals[cat.key] = (staffStats[s.name].categoryTotals[cat.key] || 0) + val;
+          staffStats[s.name].total += val;
+
+          if (cat.key === "goi_mong") staffStats[s.name].goi_mong += val;
+          if (cat.key === "mi") staffStats[s.name].mi += val;
+          if (cat.key === "ngoai_gio") staffStats[s.name].ngoai_gio += val;
+        });
       });
     }
 
@@ -57,17 +77,19 @@ async function getDailySummary(dateStr) {
     }
   });
 
-  const totalRevenue = totalGoiMong + totalMi + totalNgoaiGio;
+  const totalRevenue = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
   const netProfit = totalRevenue - totalExpenses;
 
   return {
     dateStr,
     reportsCount: reports.length,
     reports,
+    categories,
     revenue: {
-      goi_mong: totalGoiMong,
-      mi: totalMi,
-      ngoai_gio: totalNgoaiGio,
+      ...categoryTotals,
+      goi_mong: categoryTotals["goi_mong"] || 0,
+      mi: categoryTotals["mi"] || 0,
+      ngoai_gio: categoryTotals["ngoai_gio"] || 0,
       total: totalRevenue
     },
     expenses: {
@@ -87,9 +109,10 @@ async function getMonthlySummary(yearMonth) {
     installmentRepo.getActiveInstallmentsForMonth(yearMonth)
   ]);
 
-  let totalRevenueGoiMong = 0;
-  let totalRevenueMi = 0;
-  let totalRevenueNgoaiGio = 0;
+  const categories = commissionConfig.categories || configRepo.DEFAULT_CATEGORIES;
+  const categoryTotals = {};
+  categories.forEach(c => { categoryTotals[c.key] = 0; });
+
   let totalDirectExpenses = 0;
   let totalReportsCount = reports.length;
   const staffStats = {};
@@ -99,14 +122,6 @@ async function getMonthlySummary(yearMonth) {
 
     if (Array.isArray(parsed.staff_data)) {
       parsed.staff_data.forEach(s => {
-        const goiMong = s.revenue?.goi_mong || 0;
-        const mi = s.revenue?.mi || 0;
-        const ngoaiGio = s.revenue?.ngoai_gio || 0;
-
-        totalRevenueGoiMong += goiMong;
-        totalRevenueMi += mi;
-        totalRevenueNgoaiGio += ngoaiGio;
-
         if (!staffStats[s.name]) {
           staffStats[s.name] = {
             total_score: 0,
@@ -122,8 +137,14 @@ async function getMonthlySummary(yearMonth) {
             commission_mi: 0,
             commission_ngoai_gio: 0,
             total_commission: 0,
+            categoryTotals: {},
+            categoryCommissions: {},
             attendance_notes: []
           };
+          categories.forEach(c => {
+            staffStats[s.name].categoryTotals[c.key] = 0;
+            staffStats[s.name].categoryCommissions[c.key] = 0;
+          });
         }
 
         const score = s.attendance_score !== undefined ? s.attendance_score : 1;
@@ -134,19 +155,36 @@ async function getMonthlySummary(yearMonth) {
           staffStats[s.name].days_off += 1;
         }
 
-        staffStats[s.name].total_goi_mong += goiMong;
-        staffStats[s.name].total_mi += mi;
-        staffStats[s.name].total_ngoai_gio += ngoaiGio;
-        staffStats[s.name].total_revenue += (goiMong + mi + ngoaiGio);
+        categories.forEach(cat => {
+          let val = 0;
+          if (typeof s.revenue === "object" && s.revenue !== null) {
+            val = Number(s.revenue[cat.key]) || 0;
+          }
+          if (!val && cat.key === "goi_mong") val = Number(s.goi_mong || s.goi || 0);
+          if (!val && cat.key === "mi") val = Number(s.mi || s.xam || 0);
+          if (!val && cat.key === "ngoai_gio") val = Number(s.ngoai_gio || s.tang_ca || 0);
 
-        const commGM = Math.round(goiMong * (commissionConfig.goi_mong_percent / 100));
-        const commMi = Math.round(mi * (commissionConfig.mi_percent / 100));
-        const commNG = Math.round(ngoaiGio * (commissionConfig.ngoai_gio_percent / 100));
+          const comm = Math.round(val * (cat.percent / 100));
 
-        staffStats[s.name].commission_goi_mong += commGM;
-        staffStats[s.name].commission_mi += commMi;
-        staffStats[s.name].commission_ngoai_gio += commNG;
-        staffStats[s.name].total_commission += (commGM + commMi + commNG);
+          categoryTotals[cat.key] = (categoryTotals[cat.key] || 0) + val;
+          staffStats[s.name].categoryTotals[cat.key] = (staffStats[s.name].categoryTotals[cat.key] || 0) + val;
+          staffStats[s.name].categoryCommissions[cat.key] = (staffStats[s.name].categoryCommissions[cat.key] || 0) + comm;
+          staffStats[s.name].total_revenue += val;
+          staffStats[s.name].total_commission += comm;
+
+          if (cat.key === "goi_mong") {
+            staffStats[s.name].total_goi_mong += val;
+            staffStats[s.name].commission_goi_mong += comm;
+          }
+          if (cat.key === "mi") {
+            staffStats[s.name].total_mi += val;
+            staffStats[s.name].commission_mi += comm;
+          }
+          if (cat.key === "ngoai_gio") {
+            staffStats[s.name].total_ngoai_gio += val;
+            staffStats[s.name].commission_ngoai_gio += comm;
+          }
+        });
 
         if (s.attendance_description) {
           const desc = s.attendance_description.trim();
@@ -181,7 +219,7 @@ async function getMonthlySummary(yearMonth) {
     });
   }
 
-  const totalRevenueAll = totalRevenueGoiMong + totalRevenueMi + totalRevenueNgoaiGio;
+  const totalRevenueAll = Object.values(categoryTotals).reduce((a, b) => a + b, 0);
   const totalAllExpenses = totalDirectExpenses + totalInstallmentExpenses;
   const netProfit = totalRevenueAll - totalAllExpenses;
 
@@ -190,10 +228,12 @@ async function getMonthlySummary(yearMonth) {
     daysCount: reports.length,
     totalReportsCount,
     commissionConfig,
+    categories,
     revenue: {
-      goi_mong: totalRevenueGoiMong,
-      mi: totalRevenueMi,
-      ngoai_gio: totalRevenueNgoaiGio,
+      ...categoryTotals,
+      goi_mong: categoryTotals["goi_mong"] || 0,
+      mi: categoryTotals["mi"] || 0,
+      ngoai_gio: categoryTotals["ngoai_gio"] || 0,
       total: totalRevenueAll
     },
     expenses: {

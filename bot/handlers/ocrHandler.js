@@ -112,6 +112,9 @@ async function processMediaBatch(mediaGroupId, statusMsg, batchData) {
     const draftId = confirmHandler.saveDraft(result, {
       userInfo,
       inputType: `photo_album (${imageBuffers.length} ảnh)`
+    }, {
+      telegram: ctx.telegram,
+      chatId: ctx.chat.id
     });
 
     const previewMsg = confirmHandler.formatPreviewResponse(
@@ -250,6 +253,8 @@ async function handleOcrMessage(ctx, next) {
         );
         const replyMarkup = confirmHandler.buildPreviewKeyboards(draftId, existingCount);
 
+        confirmHandler.scheduleDraftTimers(draftId, ctx.telegram, ctx.chat.id);
+
         try { await ctx.telegram.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch (e) {}
         await ctx.reply(`✨ **ĐÃ CẬP NHẬT ĐÍNH CHÍNH BÁO CÁO!**\n\n${previewMsg}`, {
           parse_mode: "Markdown",
@@ -367,6 +372,9 @@ async function handleOcrMessage(ctx, next) {
     const draftId = confirmHandler.saveDraft(result, {
       userInfo,
       inputType: photo ? "photo" : "text"
+    }, {
+      telegram: ctx.telegram,
+      chatId: ctx.chat.id
     });
 
     const previewMsg = confirmHandler.formatPreviewResponse(

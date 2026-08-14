@@ -17,6 +17,9 @@ function createBotApp() {
   // Kích hoạt lịch nhắc nhở 20:00 hàng ngày
   reminderService.initDailyReminder(bot);
 
+  // Khôi phục các bản nháp chưa hết hạn từ file đệm khi bot khởi động lại
+  confirmHandler.loadPersistedDrafts(bot.telegram);
+
   // Command: /start & /help
   bot.start(ctx => {
     let msg = `👋 **Cháo mừng bạn đến với Bot Quản Lý Nail Mi Tuyết Trần!**\n\n`;
@@ -55,6 +58,9 @@ function createBotApp() {
   bot.command("addstaff", adminOnlyMiddleware, adminHandler.handleAddStaff);
   bot.command("removestaff", adminOnlyMiddleware, adminHandler.handleRemoveStaff);
   bot.command("setstaff", adminOnlyMiddleware, adminHandler.handleSetStaff);
+  bot.command("categories", adminOnlyMiddleware, adminHandler.handleCategories);
+  bot.command("addcategory", adminOnlyMiddleware, adminHandler.handleAddCategory);
+  bot.command("delcategory", adminOnlyMiddleware, adminHandler.handleDelCategory);
   bot.command("setcommission", adminOnlyMiddleware, adminHandler.handleSetCommission);
   bot.command("editrevenue", adminOnlyMiddleware, adminHandler.handleEditRevenue);
   bot.command("editexpense", adminOnlyMiddleware, adminHandler.handleEditExpense);

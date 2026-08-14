@@ -28,6 +28,15 @@ Bot giải quyết triệt để bài toán bóc tách dữ liệu từ sổ tay
 - **Khấu trừ mua trả góp**: Tự động trừ chi phí mua trả góp thiết bị/máy móc tiệm vào Lợi nhuận ròng từ các tháng tiếp theo.
 - **Báo cáo & Xuất file**: Tra cứu `/today`, `/month`, `/luong` và xuất báo cáo file Excel/CSV UTF-8 tải về trực tiếp trên Telegram.
 
+### 5. ⏰ Nhắc Nhở & Tự Động Chốt Bản Nháp (Safe Guard Timers & Persistence)
+- **Nhắc nhở sau 3 phút**: Bot chủ động gửi tin nhắn cảnh báo nếu người dùng quên nhấn nút Xác Nhận/Ghi Đè báo cáo.
+- **Tự động chốt lưu sau 10 phút**: Tự động lưu bản nháp vào hệ thống và CSDL Supabase nếu sau 10 phút không có tương tác, đảm bảo số liệu không bao giờ bị thất thoát.
+- **Bảo toàn dữ liệu khi Server Restart**: Lưu đệm bản nháp vào `data/pending_drafts.json`, tự động khôi phục bản nháp và bộ đếm giờ khi Bot khởi động lại.
+
+### 6. 📊 Đồ Họa Biểu Đồ Doanh Thu Trực Quan (Visual QuickChart)
+- **Hình ảnh biểu đồ `/month`**: Tự động sinh bức ảnh Infographic biểu đồ doanh số từng thợ sắc nét gửi trực tiếp qua Telegram cùng báo cáo tổng kết tháng.
+- **Danh mục dịch vụ động (Dynamic Categories)**: Cho phép Admin thêm/xóa/sửa các hạng mục dịch vụ salon (`/categories`, `/addcategory`, `/delcategory`) tùy ý mà không cần sửa code.
+
 ---
 
 ## 🛠️ Công Nghệ Sử Dụng (Technology Stack)
@@ -36,6 +45,7 @@ Bot giải quyết triệt để bài toán bóc tách dữ liệu từ sổ tay
 - **Bot Framework**: Telegraf 4.x (Telegram Bot API Framework).
 - **Bóc Tách Chữ Viết Tay (Fast OCR)**: Google Cloud Vision API (`DOCUMENT_TEXT_DETECTION` - Chuyên dụng cho chữ viết tay mật độ cao tiếng Việt).
 - **Trí Tuệ Nhân Tạo (AI LLM)**: Google Gemini AI (`@google/generative-ai` - Dynamic discovery model).
+- **Đồ Họa Biểu Đồ**: QuickChart API Serverless rendering.
 - **Cơ Sở Dữ Liệu (Database)**: Supabase Cloud PostgreSQL (Data Access Layer với Repositories Pattern & Audit Logs).
 - **Unit Testing**: Node.js Native Test Runner (`node:test` & `node:assert` - 100% Zero Dependency).
 - **Triển Khai (Deployment)**: Render.com Web Service / Background Worker (Vận hành 24/7).
@@ -77,7 +87,7 @@ Tạo file `.env` từ file mẫu `.env.example` và điền các thông số sa
 | Lệnh | Mô tả |
 | :--- | :--- |
 | **`/today`** | Xem tổng hợp báo cáo thu chi, lợi nhuận ròng và doanh số nhân viên **hôm nay**. |
-| **`/month`** hoặc **`/month YYYY-MM`** | Xem tổng hợp báo cáo **cả tháng** (tự động cộng dồn doanh thu & trừ tiền trả góp). |
+| **`/month`** hoặc **`/month YYYY-MM`** | Xem tổng hợp báo cáo **cả tháng** kèm **ảnh biểu đồ trực quan** (tự động cộng dồn doanh thu & trừ tiền trả góp). |
 | **`/luong`** hoặc **`/luong YYYY-MM`** | Xem bảng tổng hợp số công và tổng doanh số mang về của từng thợ trong tháng. |
 | **`/export`** hoặc **`/export YYYY-MM`** | **Xuất file Excel/CSV báo cáo tháng** tải trực tiếp trên Telegram. |
 | **`/search YYYY-MM-DD`** | Tra cứu tổng hợp thu chi của một **ngày cụ thể** bất kỳ. |
@@ -85,19 +95,22 @@ Tạo file `.env` từ file mẫu `.env.example` và điền các thông số sa
 | **`/myid`** | Xem Telegram User ID cá nhân và quyền hạn hiện tại của bạn. |
 | **`/setadmin`** | Đăng ký làm Admin/Chủ tiệm (nếu hệ thống chưa có Admin). |
 
-### 👑 Lệnh Dành Cho Admin (Quản Lý Nhân Viên & Hoa Hồng)
+### 👑 Lệnh Dành Cho Admin (Quản Lý Nhân Viên & Danh Mục Dịch Vụ)
 | Lệnh | Mô tả |
 | :--- | :--- |
+| **`/categories`** | Xem danh sách các danh mục dịch vụ và tỷ lệ hoa hồng hiện tại. |
+| **`/addcategory <mã> <Tên> <hoa_hồng%>`** | Thêm danh mục dịch vụ mới (Ví dụ: `/addcategory goi_duong_sinh "Gội dưỡng sinh" 20`). |
+| **`/delcategory <mã>`** | Xóa danh mục dịch vụ khỏi hệ thống. |
+| **`/setcommission <mã_dịch_vụ> <hoa_hồng%>`** | Cài đặt tỷ lệ % hoa hồng cho dịch vụ (Ví dụ: `/setcommission mi 35`). |
 | **`/staff`** | Xem danh sách nhân viên hợp lệ hiện tại đang áp dụng. |
 | **`/addstaff Tên1, Tên2`** | Thêm nhân viên mới vào danh sách đối chiếu. |
 | **`/removestaff Tên`** | Xóa nhân viên đã nghỉ khỏi danh sách. |
 | **`/setstaff Tên1, Tên2...`** | Đặt lại toàn bộ danh sách nhân viên chuẩn cho tiệm. |
-| **`/setcommission <móng%> <mi%> <ngoài_giờ%>`** | Cài đặt tỷ lệ % hoa hồng doanh thu (Ví dụ: `/setcommission 10 30 50`). |
 
 ### ✏️ Lệnh Dành Cho Admin (Chỉnh Sửa & Xóa Thu Chi)
 | Lệnh | Mô tả |
 | :--- | :--- |
-| **`/editrevenue <ID> <Tên> <Gội/Móng> <Mi> <NgoàiGiờ>`** | Sửa nhanh doanh số nhân viên (Ví dụ: `/editrevenue REP_12345 "Quỳnh Anh" 300k 400k 0`). |
+| **`/editrevenue <ID> <Tên> <DoanhSố>`** | Sửa nhanh doanh số nhân viên (Ví dụ: `/editrevenue REP_12345 "Quỳnh Anh" 300k`). |
 | **`/editexpense <ID> <Số_tiền> <Ghi_chú>`** | Sửa khoản chi tiêu (Ví dụ: `/editexpense REP_12345 60k Mua nước đá`). |
 | **`/deletereport <ID>`** | Xóa hoàn toàn 1 lượt báo cáo bị nhập sai hoặc trùng lặp. |
 | **`/deleteragop <INS_ID>`** | Xóa 1 hợp đồng mua trả góp nếu nhập sai. |
@@ -110,7 +123,9 @@ Chạy bộ unit test tích hợp sẵn của Node.js:
 ```bash
 npm test
 ```
-- Kiểm tra quản lý bản nháp (Draft Store & Pending Edit State).
+- Kiểm tra quản lý bản nháp & đếm giờ tự động chốt lưu (Draft Store, Safe Guard Timers & File Persistence).
 - Kiểm tra tạo bàn phím menu Sửa Nhanh & bản Copyable Text.
 - Kiểm tra logic bóc tách Hybrid OCR & Google Cloud Vision API.
-- Kiểm tra định dạng tin nhắn xem trước & cảnh báo an toàn.
+- Kiểm tra tạo hình ảnh biểu đồ QuickChart (`chartService.test.js`).
+- Kiểm tra quản lý danh mục dịch vụ động (`dynamicCategories.test.js`).
+

@@ -83,10 +83,13 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
     ]);
   };
 
+const configRepo = require("../db/repositories/configRepository");
+
   for (const modelName of candidateModels) {
     try {
       const activeStaffList = customStaffList || (await staffRepo.getStaffList());
-      const systemPrompt = getSystemPrompt(activeStaffList);
+      const config = await configRepo.getCommissionConfig();
+      const systemPrompt = getSystemPrompt(activeStaffList, config.categories);
 
       const model = genAI.getGenerativeModel({
         model: modelName,

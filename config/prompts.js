@@ -1,5 +1,24 @@
-function getSystemPrompt(staffList) {
+function getSystemPrompt(staffList, categoriesList = []) {
   const staffString = staffList.join(", ");
+  
+  let categoriesRules = "";
+  let sampleRevenueFields = {};
+  
+  if (Array.isArray(categoriesList) && categoriesList.length > 0) {
+    categoriesRules = categoriesList.map((cat, idx) => 
+      `${idx + 3}. **Khu vực ${cat.percent}% (${cat.label} - ${cat.key})**: Các con số tương ứng với dịch vụ ${cat.label} (tỷ lệ hoa hồng ${cat.percent}%).`
+    ).join("\n");
+
+    categoriesList.forEach(cat => {
+      sampleRevenueFields[cat.key] = 0;
+    });
+  } else {
+    categoriesRules = `3. **Khu vực 10% (Gội/Móng - goi_mong)**: Các con số nằm ở bảng phía trên (dưới tên nhân viên).
+4. **Khu vực 30% (Mi/Xăm - mi)**: Các con số nằm phía dưới dòng tiêu đề "30%" (hoặc 30).
+5. **Khu vực 50% (Ngoài giờ - ngoai_gio)**: Các con số nằm phía dưới dòng tiêu đề "50%" (hoặc 50).`;
+    sampleRevenueFields = { goi_mong: 1490000, mi: 350000, ngoai_gio: 0 };
+  }
+
   return `Bạn là một trợ lý AI xử lý dữ liệu (OCR chuyên sâu) cho tiệm Nail Mi Tuyết Trần.
 Nhiệm vụ của bạn là phân tích hình ảnh (bảng viết tay, ảnh chụp màn hình) hoặc đoạn tin nhắn do chủ tiệm gửi lên. Bóc tách toàn bộ dữ liệu Doanh thu nhân viên, Ca làm việc, và các khoản Chi tiêu trong ngày rồi trả về định dạng JSON nghiêm ngặt.
 
@@ -34,9 +53,7 @@ Nhiệm vụ của bạn là phân tích hình ảnh (bảng viết tay, ảnh c
 ### QUY TẮC CỘT DỌC SỔ TAY & KHU VỰC DỊCH VỤ:
 1. Sổ báo cáo được thiết kế theo CỘT DỌC từ trái sang phải. Tên nhân viên nằm ở tiêu đề trên cùng của cột (Ví dụ: "Hue" ➔ Huệ, "Cuc" ➔ chị Cúc, "QA" ➔ Quỳnh Anh, "Thảo"/"Thao" ➔ Thảo).
 2. TẤT CẢ các con số nằm bên dưới cột nào BẮT BUỘC phải cộng tổng doanh thu cho nhân viên đứng ở tiêu đề đầu cột đó!
-3. **Khu vực 10% (Gội/Móng - goi_mong)**: Các con số nằm ở bảng phía trên (dưới tên nhân viên).
-4. **Khu vực 30% (Mi/Xăm - mi)**: Các con số nằm phía dưới dòng tiêu đề "30%" (hoặc 30). Con số nằm ở cột nào thì tính vào nhóm mi (30%) của nhân viên ở cột đó. (Ví dụ: Trong dòng 30%, số 150 dưới cột QA ➔ tính 150k mi cho Quỳnh Anh).
-5. **Khu vực 50% (Ngoài giờ - ngoai_gio)**: Các con số nằm phía dưới dòng tiêu đề "50%" (hoặc 50).
+${categoriesRules}
 
 ### QUY TẮC PHÂN TÍCH CÁC DÒNG SỬA SỐ & GẠCH XÓA (CORRECTIONS VS DELETIONS):
 1. **VIẾT ĐÈ / SỬA SỐ (Overwritten/Corrected values)**:
@@ -92,22 +109,12 @@ CẤU TRÚC JSON MẪU 1 (DÀNH CHO BÁO CÁO THU CHI):
       "attendance_score": 1.0,
       "attendance_description": "Làm cả ngày",
       "is_unknown_staff": false,
-      "revenue": {
-        "goi_mong": 1490000,
-        "mi": 350000,
-        "ngoai_gio": 0
-      }
+      "revenue": ${JSON.stringify(sampleRevenueFields, null, 8).replace(/\n\s*}/, "\n      }")}
     }
   ],
   "expenses_data": [],
   "installments_data": [],
-  "deleted_items": [
-    {
-      "content": "Số 150 bị gạch xóa trong phép tính 200 + 150 tại khu vực 30%",
-      "original_amount": 150000,
-      "reason": "Nét mực gạch ngang"
-    }
-  ]
+  "deleted_items": []
 }
 
 CẤU TRÚC JSON MẪU 2 (DÀNH CHO TRÒ CHUYỆN / HỎI ĐÁP CHUNG):

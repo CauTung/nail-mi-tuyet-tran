@@ -1,5 +1,24 @@
 {
-  "goi_mong_percent": 10,
-  "mi_percent": 30,
-  "ngoai_gio_percent": 50
+  "categories": [
+    {
+      "key": "goi_mong",
+      "label": "Gội / Móng",
+      "percent": 10
+    },
+    {
+      "key": "mi",
+      "label": "Mi / Phun Xăm",
+      "percent": 30
+    },
+    {
+      "key": "ngoai_gio",
+      "label": "Ngoài Giờ / Tăng Ca",
+      "percent": 50
+    },
+    {
+      "key": "goi_duong_sinh",
+      "label": "Gội dưỡng sinh",
+      "percent": 20
+    }
+  ]
 }

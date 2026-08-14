@@ -71,27 +71,85 @@ async function handleSetStaff(ctx) {
   return ctx.reply(`✅ **Đã cập nhật toàn bộ danh sách nhân viên chuẩn!**\nDanh sách: ${updated.map(n => `\`${n}\``).join(", ")}`, { parse_mode: "Markdown" });
 }
 
-async function handleSetCommission(ctx) {
-  const parts = ctx.message.text.trim().split(" ");
-  if (parts.length < 4) {
-    return ctx.reply("⚠️ Cú pháp: `/setcommission <goimong%> <mi%> <ngoaigio%>` (Ví dụ: `/setcommission 10 30 50`)", { parse_mode: "Markdown" });
-  }
+async function handleCategories(ctx) {
+  const config = await configRepo.getCommissionConfig();
+  const categories = config.categories || [];
 
-  const gm = parseInt(parts[1], 10);
-  const mi = parseInt(parts[2], 10);
-  const ng = parseInt(parts[3], 10);
-
-  if (isNaN(gm) || isNaN(mi) || isNaN(ng)) {
-    return ctx.reply("❌ Tỷ lệ % phải là số nguyên hợp lệ!", { parse_mode: "Markdown" });
-  }
-
-  const updated = await configRepo.saveCommissionConfig({
-    goi_mong_percent: gm,
-    mi_percent: mi,
-    ngoai_gio_percent: ng
+  let msg = `🏷️ **DANH SÁCH DANH MỤC DỊCH VỤ & HOA HỒNG:**\n\n`;
+  categories.forEach((cat, idx) => {
+    msg += `${idx + 1}. **${cat.label}** (Mã: \`${cat.key}\`) ➔ Hoa hồng: **${cat.percent}%**\n`;
   });
 
-  return ctx.reply(`✅ **Đã cập nhật tỷ lệ % hoa hồng doanh thu:**\n• Gội/Móng: **${updated.goi_mong_percent}%**\n• Mi/Phun xăm: **${updated.mi_percent}%**\n• Ngoài giờ/Tăng ca: **${updated.ngoai_gio_percent}%**`, { parse_mode: "Markdown" });
+  msg += `\n💡 **Lệnh Admin quản lý:**\n`;
+  msg += `• `/addcategory <key> "<Tên hiển thị>" <%_hoa_hồng>`\n`;
+  msg += `• `/setcommission <key> <%_mới>`\n`;
+  msg += `• `/delcategory <key>`\n`;
+
+  return ctx.reply(msg, { parse_mode: "Markdown" });
+}
+
+async function handleAddCategory(ctx) {
+  const text = ctx.message.text.trim();
+  const match = text.match(/^\/addcategory\s+(\S+)\s+"([^"]+)"\s+(\d+)$/) ||
+                text.match(/^\/addcategory\s+(\S+)\s+(\S+)\s+(\d+)$/);
+
+  if (!match) {
+    return ctx.reply('⚠️ Cú pháp: `/addcategory <key> "<Tên hiển thị>" <%_hoa_hồng>`\nVí dụ: `/addcategory san_pham "Bán sản phẩm" 15`', { parse_mode: "Markdown" });
+  }
+
+  const [, key, label, rawPercent] = match;
+  const percent = Number(rawPercent);
+
+  const updated = await configRepo.addCategory(key, label, percent);
+  return ctx.reply(`✅ **Đã thêm/cập nhật danh mục dịch vụ!**\n🏷️ Tên: **${label}** (\`${key}\`)\n💰 Hoa hồng: **${percent}%**`, { parse_mode: "Markdown" });
+}
+
+async function handleDelCategory(ctx) {
+  const parts = ctx.message.text.trim().split(" ");
+  if (parts.length < 2) {
+    return ctx.reply("⚠️ Cú pháp: `/delcategory <key>` (Ví dụ: `/delcategory san_pham`)", { parse_mode: "Markdown" });
+  }
+
+  const key = parts[1].trim();
+  await configRepo.removeCategory(key);
+  return ctx.reply(`✅ **Đã xóa danh mục dịch vụ \`${key}\` khỏi hệ thống!**`, { parse_mode: "Markdown" });
+}
+
+async function handleSetCommission(ctx) {
+  const parts = ctx.message.text.trim().split(" ");
+  if (parts.length === 3) {
+    const key = parts[1];
+    const percent = Number(parts[2]);
+    if (isNaN(percent)) {
+      return ctx.reply("❌ Tỷ lệ % phải là số hợp lệ!", { parse_mode: "Markdown" });
+    }
+    try {
+      await configRepo.setCategoryPercent(key, percent);
+      return ctx.reply(`✅ **Đã cập nhật tỷ lệ hoa hồng cho \`${key}\` thành ${percent}%!**`, { parse_mode: "Markdown" });
+    } catch (err) {
+      return ctx.reply(`❌ ${err.message}`, { parse_mode: "Markdown" });
+    }
+  }
+
+  if (parts.length >= 4) {
+    const gm = parseInt(parts[1], 10);
+    const mi = parseInt(parts[2], 10);
+    const ng = parseInt(parts[3], 10);
+
+    if (isNaN(gm) || isNaN(mi) || isNaN(ng)) {
+      return ctx.reply("❌ Tỷ lệ % phải là số nguyên hợp lệ!", { parse_mode: "Markdown" });
+    }
+
+    const updated = await configRepo.saveCommissionConfig({
+      goi_mong_percent: gm,
+      mi_percent: mi,
+      ngoai_gio_percent: ng
+    });
+
+    return ctx.reply(`✅ **Đã cập nhật tỷ lệ % hoa hồng doanh thu:**\n• Gội/Móng: **${updated.goi_mong_percent}%**\n• Mi/Phun xăm: **${updated.mi_percent}%**\n• Ngoài giờ/Tăng ca: **${updated.ngoai_gio_percent}%**`, { parse_mode: "Markdown" });
+  }
+
+  return ctx.reply("⚠️ Cú pháp:\n• `/setcommission <key> <%_mới>` (Ví dụ: `/setcommission mi 35`)\n• `/setcommission <goimong%> <mi%> <ngoaigio%>` (Ví dụ: `/setcommission 10 30 50`)", { parse_mode: "Markdown" });
 }
 
 async function handleEditRevenue(ctx) {
@@ -198,6 +256,9 @@ module.exports = {
   handleAddStaff,
   handleRemoveStaff,
   handleSetStaff,
+  handleCategories,
+  handleAddCategory,
+  handleDelCategory,
   handleSetCommission,
   handleEditRevenue,
   handleEditExpense,

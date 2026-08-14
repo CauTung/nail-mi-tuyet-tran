@@ -1,12 +1,132 @@
-const reportRepo = require("../../db/repositories/reportRepository");
-const staffRepo = require("../../db/repositories/staffRepository");
+const fs = require("fs");
+const path = require("path");
+
+const DRAFTS_FILE_PATH = path.join(__dirname, "../../data/pending_drafts.json");
 
 // Mảng lưu bản nháp tạm thời trong bộ nhớ server trước khi bấm nút xác nhận
 const draftStore = new Map();
 // Mảng lưu trạng thái chờ tin nhắn đính chính (Sửa Nhanh) từ người dùng (key: userId)
 const pendingEdits = new Map();
+// Mảng lưu bộ hẹn giờ nhắc nhở & tự động chốt (key: draftId)
+const draftTimers = new Map();
 
-function saveDraft(result, metaInfo) {
+function persistDraftsToFile() {
+  try {
+    const dataDir = path.dirname(DRAFTS_FILE_PATH);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    const draftsArray = [];
+    draftStore.forEach((value, key) => {
+      const timers = draftTimers.get(key);
+      draftsArray.push({
+        draftId: key,
+        result: value.result,
+        metaInfo: value.metaInfo,
+        createdAt: value.createdAt,
+        chatId: timers?.chatId || null
+      });
+    });
+    fs.writeFileSync(DRAFTS_FILE_PATH, JSON.stringify(draftsArray, null, 2), "utf8");
+  } catch (err) {
+    console.warn("⚠️ Không thể ghi file pending_drafts.json:", err.message);
+  }
+}
+
+function loadPersistedDrafts(telegram) {
+  try {
+    if (!fs.existsSync(DRAFTS_FILE_PATH)) return;
+    const raw = fs.readFileSync(DRAFTS_FILE_PATH, "utf8");
+    const draftsArray = JSON.parse(raw);
+    if (!Array.isArray(draftsArray)) return;
+
+    const now = Date.now();
+    draftsArray.forEach(d => {
+      // Hết hạn sau 30 phút
+      if (now - d.createdAt < 30 * 60 * 1000) {
+        draftStore.set(d.draftId, {
+          result: d.result,
+          metaInfo: d.metaInfo,
+          createdAt: d.createdAt
+        });
+
+        if (d.chatId && telegram) {
+          scheduleDraftTimers(d.draftId, telegram, d.chatId);
+        }
+      }
+    });
+    console.log(`📦 [DRAFT PERSISTENCE] Đã khôi phục thành công ${draftStore.size} bản nháp từ bộ nhớ đệm.`);
+  } catch (err) {
+    console.warn("⚠️ Không thể đọc file pending_drafts.json:", err.message);
+  }
+}
+
+// Thời gian mặc định: Nhắc nhở sau 3 phút, Tự động chốt lưu sau 10 phút
+let REMINDER_DELAY_MS = 3 * 60 * 1000;
+let AUTOSAVE_DELAY_MS = 10 * 60 * 1000;
+
+function setTimerDurationsForTesting(reminderMs, autoSaveMs) {
+  REMINDER_DELAY_MS = reminderMs;
+  AUTOSAVE_DELAY_MS = autoSaveMs;
+}
+
+function clearDraftTimers(draftId) {
+  const timers = draftTimers.get(draftId);
+  if (timers) {
+    if (timers.reminderTimeout) clearTimeout(timers.reminderTimeout);
+    if (timers.autoSaveTimeout) clearTimeout(timers.autoSaveTimeout);
+    draftTimers.delete(draftId);
+  }
+}
+
+function scheduleDraftTimers(draftId, telegram, chatId) {
+  clearDraftTimers(draftId);
+
+  if (!telegram || !chatId) return;
+
+  const reminderTimeout = setTimeout(async () => {
+    const draft = draftStore.get(draftId);
+    if (draft) {
+      try {
+        const targetDate = draft.result.report_date || new Date().toISOString().substring(0, 10);
+        await telegram.sendMessage(chatId, `⏰ **NHẮC NHỞ CHỐT BÁO CÁO:**\nBạn có một bản nháp báo cáo ngày \`${targetDate}\` chưa được chốt lưu!\n\nVui lòng kiểm tra tin nhắn xem trước phía trên và bấm nút **[Xác Nhận]**, **[Cộng Dồn]** hoặc **[Ghi Đè]**.\nℹ️ *Bot sẽ tự động chốt lưu báo cáo này sau 7 phút nữa nếu bạn không thao tác.*`, { parse_mode: "Markdown" });
+      } catch (err) {
+        console.warn(`⚠️ Lỗi khi gửi tin nhắn nhắc nhở draft ${draftId}:`, err.message);
+      }
+    }
+  }, REMINDER_DELAY_MS);
+
+  const autoSaveTimeout = setTimeout(async () => {
+    const draft = draftStore.get(draftId);
+    if (draft) {
+      try {
+        const saved = await reportRepo.saveReport(draft.result, {
+          userInfo: draft.metaInfo?.userInfo,
+          inputType: draft.metaInfo?.inputType || "auto_confirm_timeout"
+        });
+
+        if (Array.isArray(draft.result.staff_data)) {
+          for (const s of draft.result.staff_data) {
+            const staffName = (s.name || s.staff_name || "").trim();
+            if (staffName && s.is_unknown_staff) {
+              try { await staffRepo.addStaff(staffName); } catch (e) {}
+            }
+          }
+        }
+
+        await telegram.sendMessage(chatId, `🤖 **TỰ ĐỘNG CHỐT LƯU BÁO CÁO:**\nDo bạn không thao tác sau 10 phút, Bot đã tự động chốt lưu báo cáo ngày \`${saved.dateStr}\` thành công!\n🆔 Mã báo cáo: \`${saved.record.id}\``, { parse_mode: "Markdown" });
+
+        deleteDraft(draftId);
+      } catch (err) {
+        console.error(`❌ Lỗi khi tự động chốt lưu draft ${draftId}:`, err);
+      }
+    }
+  }, AUTOSAVE_DELAY_MS);
+
+  draftTimers.set(draftId, { reminderTimeout, autoSaveTimeout, telegram, chatId });
+}
+
+function saveDraft(result, metaInfo, telegramOptions = null) {
   const draftId = `DRAFT_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
   draftStore.set(draftId, {
     result,
@@ -14,9 +134,19 @@ function saveDraft(result, metaInfo) {
     createdAt: Date.now()
   });
 
+  if (telegramOptions && telegramOptions.telegram && telegramOptions.chatId) {
+    scheduleDraftTimers(draftId, telegramOptions.telegram, telegramOptions.chatId);
+  }
+
+  persistDraftsToFile();
+
   // Tự động xóa draft sau 30 phút để giải phóng RAM
   setTimeout(() => {
-    draftStore.delete(draftId);
+    if (draftStore.has(draftId)) {
+      clearDraftTimers(draftId);
+      draftStore.delete(draftId);
+      persistDraftsToFile();
+    }
   }, 30 * 60 * 1000);
 
   return draftId;
@@ -27,7 +157,9 @@ function getDraft(draftId) {
 }
 
 function deleteDraft(draftId) {
+  clearDraftTimers(draftId);
   draftStore.delete(draftId);
+  persistDraftsToFile();
 }
 
 function setPendingEdit(userId, draftId, editType = "general", itemIndex = null) {
@@ -45,6 +177,13 @@ function getPendingEdit(userId) {
 
 function clearPendingEdit(userId) {
   pendingEdits.delete(userId);
+}
+
+function getStaffTotalRevenue(s) {
+  if (s && s.revenue && typeof s.revenue === "object") {
+    return Object.values(s.revenue).reduce((sum, val) => sum + (Number(val) || 0), 0);
+  }
+  return (Number(s?.goi_mong) || 0) + (Number(s?.mi) || 0) + (Number(s?.ngoai_gio) || 0);
 }
 
 function formatPreviewResponse(reportData, targetDateStr, confidence, dateReasoning, existingCount = 0) {
@@ -73,10 +212,7 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
   if (Array.isArray(reportData.staff_data) && reportData.staff_data.length > 0) {
     msg += `👩‍🎨 **CHI TIẾT DOANH SỐ NHÂN VIÊN:**\n`;
     reportData.staff_data.forEach(s => {
-      const gm = (typeof s.revenue === "object" ? s.revenue?.goi_mong : 0) || s.goi_mong || 0;
-      const mi = (typeof s.revenue === "object" ? s.revenue?.mi : 0) || s.mi || 0;
-      const ng = (typeof s.revenue === "object" ? s.revenue?.ngoai_gio : 0) || s.ngoai_gio || 0;
-      const total = gm + mi + ng;
+      const total = getStaffTotalRevenue(s);
       grandTotal += total;
 
       const staffName = s.name || s.staff_name || "Nhân viên";
@@ -196,10 +332,7 @@ function buildStaffListKeyboards(draftId, staffData = []) {
   const keyboard = [];
   if (Array.isArray(staffData) && staffData.length > 0) {
     staffData.forEach((s, idx) => {
-      const gm = (typeof s.revenue === "object" ? s.revenue?.goi_mong : 0) || s.goi_mong || 0;
-      const mi = (typeof s.revenue === "object" ? s.revenue?.mi : 0) || s.mi || 0;
-      const ng = (typeof s.revenue === "object" ? s.revenue?.ngoai_gio : 0) || s.ngoai_gio || 0;
-      const total = gm + mi + ng;
+      const total = getStaffTotalRevenue(s);
       const staffName = s.name || s.staff_name || `Thợ ${idx + 1}`;
       keyboard.push([
         { text: `👩‍🎨 ${staffName}: ${new Intl.NumberFormat("vi-VN").format(total)}đ`, callback_data: `edit_staff_item:${draftId}:${idx}` }
@@ -244,14 +377,27 @@ function formatCopyableText(reportData, targetDateStr) {
   if (Array.isArray(reportData.staff_data) && reportData.staff_data.length > 0) {
     reportData.staff_data.forEach(s => {
       const name = s.name || s.staff_name || "Nhân viên";
-      const gm = (typeof s.revenue === "object" ? s.revenue?.goi_mong : 0) || s.goi_mong || 0;
-      const mi = (typeof s.revenue === "object" ? s.revenue?.mi : 0) || s.mi || 0;
-      const ng = (typeof s.revenue === "object" ? s.revenue?.ngoai_gio : 0) || s.ngoai_gio || 0;
       let parts = [];
-      if (gm > 0) parts.push(`Gội/Móng ${new Intl.NumberFormat("vi-VN").format(gm)}đ`);
-      if (mi > 0) parts.push(`Mi/Xăm ${new Intl.NumberFormat("vi-VN").format(mi)}đ`);
-      if (ng > 0) parts.push(`Ngoài giờ ${new Intl.NumberFormat("vi-VN").format(ng)}đ`);
-      if (parts.length === 0) parts.push(`${new Intl.NumberFormat("vi-VN").format(gm + mi + ng)}đ`);
+
+      if (s.revenue && typeof s.revenue === "object") {
+        Object.entries(s.revenue).forEach(([k, val]) => {
+          const num = Number(val) || 0;
+          if (num > 0) {
+            parts.push(`${k} ${new Intl.NumberFormat("vi-VN").format(num)}đ`);
+          }
+        });
+      } else {
+        const gm = s.goi_mong || 0;
+        const mi = s.mi || 0;
+        const ng = s.ngoai_gio || 0;
+        if (gm > 0) parts.push(`Gội/Móng ${new Intl.NumberFormat("vi-VN").format(gm)}đ`);
+        if (mi > 0) parts.push(`Mi/Xăm ${new Intl.NumberFormat("vi-VN").format(mi)}đ`);
+        if (ng > 0) parts.push(`Ngoài giờ ${new Intl.NumberFormat("vi-VN").format(ng)}đ`);
+      }
+
+      if (parts.length === 0) {
+        parts.push(`${new Intl.NumberFormat("vi-VN").format(getStaffTotalRevenue(s))}đ`);
+      }
       text += `- ${name}: ${parts.join(", ")}\n`;
     });
   } else {
@@ -436,6 +582,11 @@ module.exports = {
   saveDraft,
   getDraft,
   deleteDraft,
+  loadPersistedDrafts,
+  persistDraftsToFile,
+  scheduleDraftTimers,
+  clearDraftTimers,
+  setTimerDurationsForTesting,
   setPendingEdit,
   getPendingEdit,
   clearPendingEdit,
