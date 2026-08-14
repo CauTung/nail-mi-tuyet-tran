@@ -469,37 +469,55 @@ async function handleCallbackQuery(ctx) {
 
   if (action === "confirm_save" || action === "confirm_append") {
     await ctx.answerCbQuery("⏳ Đang lưu báo cáo...");
-    draft.result.replacement_mode = "append";
-    const saved = await reportRepo.saveReport(draft.result, {
-      userInfo: draft.metaInfo.userInfo,
-      inputType: draft.metaInfo.inputType
-    });
+    try {
+      draft.result.replacement_mode = "append";
+      const saved = await reportRepo.saveReport(draft.result, {
+        userInfo: draft.metaInfo.userInfo,
+        inputType: draft.metaInfo.inputType
+      });
 
-    await reportRepo.logAuditAction("CREATE", saved.dateStr, saved.record.id, userInfo, "Lưu báo cáo mới thành công");
-    await autoSaveNewStaff(draft.result.staff_data);
+      await reportRepo.logAuditAction("CREATE", saved.dateStr, saved.record.id, userInfo, "Lưu báo cáo mới thành công");
+      await autoSaveNewStaff(draft.result.staff_data);
 
-    deleteDraft(draftId);
-    clearPendingEdit(ctx.from.id);
-    await ctx.editMessageText(`✅ **ĐÃ LƯU THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n🆔 Mã báo cáo: \`${saved.record.id}\``, {
-      parse_mode: "Markdown"
-    });
+      deleteDraft(draftId);
+      clearPendingEdit(ctx.from.id);
+
+      const successMsg = `✅ **ĐÃ LƯU THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n🆔 Mã báo cáo: \`${saved.record.id}\`\n💰 Tổng doanh thu: ${new Intl.NumberFormat("vi-VN").format(saved.record.parsed_result?.grand_total || 0)}đ`;
+      try {
+        await ctx.editMessageText(successMsg, { parse_mode: "Markdown" });
+      } catch (e) {
+        await ctx.reply(successMsg, { parse_mode: "Markdown" });
+      }
+    } catch (err) {
+      console.error("❌ Lỗi chốt lưu báo cáo:", err);
+      await ctx.reply(`❌ ** KHÔNG THỂ LƯU BÁO CÁO!**\nChi tiết lỗi: \`${err.message}\``, { parse_mode: "Markdown" });
+    }
 
   } else if (action === "confirm_overwrite") {
     await ctx.answerCbQuery("⏳ Đang sao lưu bản cũ & ghi đè báo cáo mới...");
-    draft.result.replacement_mode = "replace_all";
-    const saved = await reportRepo.saveReport(draft.result, {
-      userInfo: draft.metaInfo.userInfo,
-      inputType: draft.metaInfo.inputType
-    });
+    try {
+      draft.result.replacement_mode = "replace_all";
+      const saved = await reportRepo.saveReport(draft.result, {
+        userInfo: draft.metaInfo.userInfo,
+        inputType: draft.metaInfo.inputType
+      });
 
-    await reportRepo.logAuditAction("OVERWRITE", saved.dateStr, saved.record.id, userInfo, "Ghi đè báo cáo thành công (Đã sao lưu bản cũ)");
-    await autoSaveNewStaff(draft.result.staff_data);
+      await reportRepo.logAuditAction("OVERWRITE", saved.dateStr, saved.record.id, userInfo, "Ghi đè báo cáo thành công (Đã sao lưu bản cũ)");
+      await autoSaveNewStaff(draft.result.staff_data);
 
-    deleteDraft(draftId);
-    clearPendingEdit(ctx.from.id);
-    await ctx.editMessageText(`🔄 **ĐÃ GHI ĐÈ THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n📦 Bản cũ đã được sao lưu an toàn.\n🆔 Mã báo cáo mới: \`${saved.record.id}\``, {
-      parse_mode: "Markdown"
-    });
+      deleteDraft(draftId);
+      clearPendingEdit(ctx.from.id);
+
+      const successMsg = `🔄 **ĐÃ GHI ĐÈ THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n📦 Bản cũ đã được sao lưu an toàn.\n🆔 Mã báo cáo mới: \`${saved.record.id}\``;
+      try {
+        await ctx.editMessageText(successMsg, { parse_mode: "Markdown" });
+      } catch (e) {
+        await ctx.reply(successMsg, { parse_mode: "Markdown" });
+      }
+    } catch (err) {
+      console.error("❌ Lỗi ghi đè báo cáo:", err);
+      await ctx.reply(`❌ **KHÔNG THỂ GHI ĐÈ BÁO CÁO!**\nChi tiết lỗi: \`${err.message}\``, { parse_mode: "Markdown" });
+    }
 
   } else if (action === "edit_draft") {
     await ctx.answerCbQuery("✏️ Menu Sửa Nhanh");
