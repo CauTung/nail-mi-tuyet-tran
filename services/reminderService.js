@@ -1,10 +1,12 @@
 const cron = require("node-cron");
 const env = require("../config/env");
 const adminRepo = require("../db/repositories/adminRepository");
+const { SCHEDULES } = require("../config/constants");
 
 function initDailyReminder(bot) {
-  // Lên lịch chạy vào 20:00 (8h tối) hàng ngày theo giờ Việt Nam (Asia/Ho_Chi_Minh)
-  cron.schedule("0 20 * * *", async () => {
+  // Lên lịch chạy theo SCHEDULES.DAILY_REMINDER_HOUR (20:00) hàng ngày
+  const cronPattern = `${SCHEDULES.DAILY_REMINDER_MINUTE} ${SCHEDULES.DAILY_REMINDER_HOUR} * * *`;
+  cron.schedule(cronPattern, async () => {
     console.log("⏰ [CRON REMINDER] Đang gửi thông báo nhắc nhở báo cáo thu chi 20:00...");
 
     let msg = `⏰ **NHẮC NHỞ TỔNG KẾT DOANH THU CUỐI NGÀY (20:00)**\n\n`;

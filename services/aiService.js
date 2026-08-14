@@ -3,6 +3,7 @@ const env = require("../config/env");
 const staffRepo = require("../db/repositories/staffRepository");
 const { getSystemPrompt } = require("../config/prompts");
 const fetch = require("node-fetch");
+const { TIMEOUTS } = require("../config/constants");
 
 const ocrService = require("./ocrService");
 
@@ -74,7 +75,7 @@ async function extractDailyReport({ textInput, imageBuffer, imageBuffers, mimeTy
     }
   }
 
-  const timeoutMs = buffers.length > 1 ? 60000 : 30000;
+  const timeoutMs = buffers.length > 1 ? TIMEOUTS.AI_API_MULTI_IMAGE_MS : TIMEOUTS.AI_API_SINGLE_IMAGE_MS;
 
   const withTimeout = (promise, ms = timeoutMs) => {
     return Promise.race([

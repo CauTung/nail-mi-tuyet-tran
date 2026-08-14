@@ -6,6 +6,7 @@ const { getStaffTotalRevenue, getStaffRevenueBreakdown } = require("../../servic
 const { formatMoney } = require("../../utils/formatter");
 const { safeEditOrReply, safeAnswerCbQuery } = require("../utils/botHelpers");
 const { WARNING_THRESHOLDS } = require("../../config/thresholds");
+const { TIMEOUTS } = require("../../config/constants");
 
 const DRAFTS_FILE_PATH = path.join(__dirname, "../../data/pending_drafts.json");
 
@@ -48,8 +49,8 @@ function loadPersistedDrafts(telegram) {
 
     const now = Date.now();
     draftsArray.forEach(d => {
-      // Hết hạn sau 30 phút
-      if (now - d.createdAt < 30 * 60 * 1000) {
+      // Hết hạn theo TIMEOUTS.DRAFT_EXPIRATION_MS
+      if (now - d.createdAt < TIMEOUTS.DRAFT_EXPIRATION_MS) {
         draftStore.set(d.draftId, {
           result: d.result,
           metaInfo: d.metaInfo,
@@ -146,14 +147,14 @@ function saveDraft(result, metaInfo, telegramOptions = null) {
 
   persistDraftsToFile();
 
-  // Tự động xóa draft sau 30 phút để giải phóng RAM
+  // Tự động xóa draft sau DRAFT_EXPIRATION_MS để giải phóng RAM
   setTimeout(() => {
     if (draftStore.has(draftId)) {
       clearDraftTimers(draftId);
       draftStore.delete(draftId);
       persistDraftsToFile();
     }
-  }, 30 * 60 * 1000);
+  }, TIMEOUTS.DRAFT_EXPIRATION_MS);
 
   return draftId;
 }
@@ -174,7 +175,7 @@ function setPendingEdit(userId, draftId, editType = "general", itemIndex = null)
     if (pendingEdits.get(userId)?.draftId === draftId) {
       pendingEdits.delete(userId);
     }
-  }, 15 * 60 * 1000);
+  }, TIMEOUTS.PENDING_EDIT_TTL_MS);
 }
 
 function getPendingEdit(userId) {
