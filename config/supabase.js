@@ -4,21 +4,30 @@ const env = require("./env");
 let supabase = null;
 
 if (env.supabaseUrl && env.supabaseKey) {
-  supabase = createClient(env.supabaseUrl, env.supabaseKey);
+  supabase = createClient(env.supabaseUrl, env.supabaseKey, {
+    auth: { persistSession: false }
+  });
   const keyLen = env.supabaseKey.length;
   console.log(`⚡ [SUPABASE] Đã khởi tạo Supabase Client (Target: ${env.supabaseUrl}, Key length: ${keyLen} chars)`);
 
-  // Thực hiện test ping thực tế qua HTTP GET
-  supabase.from("staff").select("id").limit(1)
-    .then(({ data, error }) => {
-      if (error) {
-        console.warn(`⚠️ [SUPABASE PING FAILED] Không thể truy vấn tới '${env.supabaseUrl}'. Chi tiết: ${error.message}`);
+  // Thực hiện test ping bằng raw fetch để bắt chi tiết err.cause
+  fetch(`${env.supabaseUrl}/rest/v1/staff?select=id&limit=1`, {
+    method: "GET",
+    headers: {
+      "apikey": env.supabaseKey,
+      "Authorization": `Bearer ${env.supabaseKey}`
+    }
+  })
+    .then(res => {
+      if (res.ok) {
+        console.log(`✅ [SUPABASE PING SUCCESS] Kết nối mạng CSDL Supabase hoàn toàn bình thường (HTTP ${res.status})!`);
       } else {
-        console.log(`✅ [SUPABASE PING SUCCESS] Kết nối mạng CSDL Supabase hoàn toàn bình thường! (Đã đọc được ${data?.length || 0} bản ghi mồi)`);
+        console.warn(`⚠️ [SUPABASE PING WARN] Supabase trả về HTTP ${res.status}: ${res.statusText}`);
       }
     })
     .catch(err => {
-      console.error(`❌ [SUPABASE NETWORK ERROR] Lỗi kết nối mạng tới '${env.supabaseUrl}': ${err.message}`);
+      const causeMsg = err.cause ? (err.cause.message || JSON.stringify(err.cause)) : "Unknown cause";
+      console.error(`❌ [SUPABASE NETWORK ERROR] Lỗi kết nối tới ${env.supabaseUrl}: ${err.message} | Nguyên nhân sâu: ${causeMsg}`);
     });
 } else {
   console.warn("⚠️ [SUPABASE] Chưa cấu hình SUPABASE_URL hoặc SUPABASE_KEY trong file .env!");
