@@ -5,6 +5,7 @@ const staffRepo = require("../../db/repositories/staffRepository");
 const { getStaffTotalRevenue, getStaffRevenueBreakdown } = require("../../services/revenueService");
 const { formatMoney } = require("../../utils/formatter");
 const { safeEditOrReply, safeAnswerCbQuery } = require("../utils/botHelpers");
+const { WARNING_THRESHOLDS } = require("../../config/thresholds");
 
 const DRAFTS_FILE_PATH = path.join(__dirname, "../../data/pending_drafts.json");
 
@@ -217,21 +218,21 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
       if (s.is_unknown_staff) {
         warnings.push(`⚠️ Tên thợ **"${staffName}"** chưa có trong hệ thống (sẽ tự động thêm khi chốt lưu).`);
       }
-      if (total >= 1000000) {
-        warnings.push(`💰 Doanh số thợ **"${staffName}"** trong ngày lớn (**${formatMoney(total)}** ≥ 1.000.000đ).`);
+      if (total >= WARNING_THRESHOLDS.STAFF_DAILY_TOTAL) {
+        warnings.push(`💰 Doanh số thợ **"${staffName}"** trong ngày lớn (**${formatMoney(total)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_DAILY_TOTAL)}).`);
       }
 
       if (s.revenue && typeof s.revenue === "object") {
         Object.entries(s.revenue).forEach(([catKey, val]) => {
           const num = Number(val) || 0;
-          if (num >= 350000) {
-            warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **${catKey}** lớn bất thường (**${formatMoney(num)}** ≥ 350.000đ).`);
+          if (num >= WARNING_THRESHOLDS.STAFF_SINGLE_ITEM) {
+            warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **${catKey}** lớn bất thường (**${formatMoney(num)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ITEM)}).`);
           }
         });
       } else {
-        if (s.goi_mong >= 350000) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Gội/Móng** lớn bất thường (**${formatMoney(s.goi_mong)}** ≥ 350.000đ).`);
-        if (s.mi >= 350000) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Mi/Xăm** lớn bất thường (**${formatMoney(s.mi)}** ≥ 350.000đ).`);
-        if (s.ngoai_gio >= 350000) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Ngoài giờ** lớn bất thường (**${formatMoney(s.ngoai_gio)}** ≥ 350.000đ).`);
+        if (s.goi_mong >= WARNING_THRESHOLDS.STAFF_SINGLE_ITEM) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Gội/Móng** lớn bất thường (**${formatMoney(s.goi_mong)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ITEM)}).`);
+        if (s.mi >= WARNING_THRESHOLDS.STAFF_SINGLE_ITEM) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Mi/Xăm** lớn bất thường (**${formatMoney(s.mi)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ITEM)}).`);
+        if (s.ngoai_gio >= WARNING_THRESHOLDS.STAFF_SINGLE_ITEM) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Ngoài giờ** lớn bất thường (**${formatMoney(s.ngoai_gio)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ITEM)}).`);
       }
 
       const breakdownParts = getStaffRevenueBreakdown(s);
@@ -242,8 +243,8 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
     msg += `\n`;
   }
 
-  if (grandTotal > 15000000) {
-    warnings.push(`💰 Tổng doanh số ngày lớn (${new Intl.NumberFormat("vi-VN").format(grandTotal)}đ > 15 triệu).`);
+  if (grandTotal >= WARNING_THRESHOLDS.DAILY_GRAND_TOTAL) {
+    warnings.push(`💰 Tổng doanh số ngày lớn (**${formatMoney(grandTotal)}** ≥ ${formatMoney(WARNING_THRESHOLDS.DAILY_GRAND_TOTAL)}).`);
   }
 
   let totalExpense = 0;
@@ -253,10 +254,10 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
       const amt = exp.amount || 0;
       totalExpense += amt;
       const notes = exp.notes || exp.category || "Chi tiêu";
-      if (amt > 2000000) {
-        warnings.push(`💸 Khoản chi **"${notes}"** lớn bất thường (${new Intl.NumberFormat("vi-VN").format(amt)}đ > 2 triệu).`);
+      if (amt >= WARNING_THRESHOLDS.SINGLE_EXPENSE) {
+        warnings.push(`💸 Khoản chi **"${notes}"** lớn bất thường (**${formatMoney(amt)}** ≥ ${formatMoney(WARNING_THRESHOLDS.SINGLE_EXPENSE)}).`);
       }
-      msg += `• ${notes}: ${new Intl.NumberFormat("vi-VN").format(amt)}đ\n`;
+      msg += `• ${notes}: ${formatMoney(amt)}\n`;
     });
     msg += `\n`;
   }
