@@ -7,6 +7,7 @@ const { formatMoney } = require("../../utils/formatter");
 const { safeEditOrReply, safeAnswerCbQuery } = require("../utils/botHelpers");
 const { WARNING_THRESHOLDS } = require("../../config/thresholds");
 const { TIMEOUTS } = require("../../config/constants");
+const { buildPreviewKeyboards, buildEditMenuKeyboards, buildStaffListKeyboards, buildExpenseListKeyboards } = require("../utils/keyboardBuilder");
 
 const DRAFTS_FILE_PATH = path.join(__dirname, "../../data/pending_drafts.json");
 
@@ -289,94 +290,7 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
   return msg;
 }
 
-function buildPreviewKeyboards(draftId, existingCount = 0) {
-  if (existingCount > 0) {
-    return {
-      inline_keyboard: [
-        [
-          { text: "➕ Cộng Dồn Lượt Mới", callback_data: `confirm_append:${draftId}` },
-          { text: "🔄 Ghi Đè Bản Cũ", callback_data: `confirm_overwrite:${draftId}` }
-        ],
-        [
-          { text: "✏️ Sửa Nhanh", callback_data: `edit_draft:${draftId}` },
-          { text: "❌ Hủy Bỏ", callback_data: `cancel_report:${draftId}` }
-        ]
-      ]
-    };
-  }
 
-  return {
-    inline_keyboard: [
-      [
-        { text: "✅ Xác Nhận Lưu", callback_data: `confirm_save:${draftId}` },
-        { text: "✏️ Sửa Nhanh", callback_data: `edit_draft:${draftId}` }
-      ],
-      [
-        { text: "❌ Hủy Bỏ", callback_data: `cancel_report:${draftId}` }
-      ]
-    ]
-  };
-}
-
-function buildEditMenuKeyboards(draftId) {
-  return {
-    inline_keyboard: [
-      [
-        { text: "📅 Sửa Ngày Ghi Nhận", callback_data: `edit_date:${draftId}` }
-      ],
-      [
-        { text: "👩‍🎨 Sửa Doanh Số Thợ", callback_data: `edit_staff_menu:${draftId}` },
-        { text: "💸 Sửa Chi Tiêu", callback_data: `edit_expense_menu:${draftId}` }
-      ],
-      [
-        { text: "📋 Copy Text Để Sửa", callback_data: `copy_text_format:${draftId}` }
-      ],
-      [
-        { text: "🔙 Quay Lại Xem Trước", callback_data: `back_to_preview:${draftId}` }
-      ]
-    ]
-  };
-}
-
-function buildStaffListKeyboards(draftId, staffData = []) {
-  const keyboard = [];
-  if (Array.isArray(staffData) && staffData.length > 0) {
-    staffData.forEach((s, idx) => {
-      const total = getStaffTotalRevenue(s);
-      const staffName = s.name || s.staff_name || `Thợ ${idx + 1}`;
-      keyboard.push([
-        { text: `👩‍🎨 ${staffName}: ${new Intl.NumberFormat("vi-VN").format(total)}đ`, callback_data: `edit_staff_item:${draftId}:${idx}` }
-      ]);
-    });
-  }
-  keyboard.push([
-    { text: "➕ Thêm Thợ Mới", callback_data: `add_staff_item:${draftId}` }
-  ]);
-  keyboard.push([
-    { text: "🔙 Quay Lại Menu Sửa", callback_data: `edit_draft:${draftId}` }
-  ]);
-  return { inline_keyboard: keyboard };
-}
-
-function buildExpenseListKeyboards(draftId, expensesData = []) {
-  const keyboard = [];
-  if (Array.isArray(expensesData) && expensesData.length > 0) {
-    expensesData.forEach((exp, idx) => {
-      const amt = exp.amount || 0;
-      const notes = exp.notes || exp.category || `Chi tiêu ${idx + 1}`;
-      keyboard.push([
-        { text: `💸 ${notes}: ${new Intl.NumberFormat("vi-VN").format(amt)}đ`, callback_data: `edit_expense_item:${draftId}:${idx}` }
-      ]);
-    });
-  }
-  keyboard.push([
-    { text: "➕ Thêm Khoản Chi Mới", callback_data: `add_expense_item:${draftId}` }
-  ]);
-  keyboard.push([
-    { text: "🔙 Quay Lại Menu Sửa", callback_data: `edit_draft:${draftId}` }
-  ]);
-  return { inline_keyboard: keyboard };
-}
 
 function formatCopyableText(reportData, targetDateStr) {
   let text = `📝 **SỬA BÁO CÁO THU CHI**\n*(Sao chép đoạn dưới, sửa thông tin và gửi lại Bot)*\n\n`;
@@ -519,11 +433,7 @@ async function handleCallbackQuery(ctx) {
     await ctx.answerCbQuery("✏️ Menu Sửa Nhanh");
     const editMenuText = `✏️ **MENU SỬA NHANH BÁO CÁO**\n------------------------------------\nVui lòng chọn thông tin bạn muốn chỉnh sửa bên dưới:`;
     const keyboard = buildEditMenuKeyboards(draftId);
-    try {
-      await ctx.editMessageText(editMenuText, { parse_mode: "Markdown", reply_markup: keyboard });
-    } catch (e) {
-      await ctx.reply(editMenuText, { parse_mode: "Markdown", reply_markup: keyboard });
-    }
+    await safeEditOrReply(ctx, editMenuText, { parse_mode: "Markdown", reply_markup: keyboard });
 
   } else if (action === "edit_date") {
     setPendingEdit(ctx.from.id, draftId, "date");
@@ -534,11 +444,7 @@ async function handleCallbackQuery(ctx) {
     await ctx.answerCbQuery("👩‍🎨 Danh sách thợ");
     const staffText = `👩‍🎨 **CHỌN THỢ CẦN CHỈNH SỬA DOANH SỐ:**\nBấm vào tên thợ bên dưới để cập nhật số tiền:`;
     const keyboard = buildStaffListKeyboards(draftId, draft.result.staff_data);
-    try {
-      await ctx.editMessageText(staffText, { parse_mode: "Markdown", reply_markup: keyboard });
-    } catch (e) {
-      await ctx.reply(staffText, { parse_mode: "Markdown", reply_markup: keyboard });
-    }
+    await safeEditOrReply(ctx, staffText, { parse_mode: "Markdown", reply_markup: keyboard });
 
   } else if (action === "edit_staff_item") {
     setPendingEdit(ctx.from.id, draftId, "staff_item", itemIndex);
@@ -556,11 +462,7 @@ async function handleCallbackQuery(ctx) {
     await ctx.answerCbQuery("💸 Danh sách chi tiêu");
     const expText = `💸 **CHỌN KHOẢN CHI CẦN CHỈNH SỬA:**\nBấm vào mục chi bên dưới để cập nhật số tiền:`;
     const keyboard = buildExpenseListKeyboards(draftId, draft.result.expenses_data);
-    try {
-      await ctx.editMessageText(expText, { parse_mode: "Markdown", reply_markup: keyboard });
-    } catch (e) {
-      await ctx.reply(expText, { parse_mode: "Markdown", reply_markup: keyboard });
-    }
+    await safeEditOrReply(ctx, expText, { parse_mode: "Markdown", reply_markup: keyboard });
 
   } else if (action === "edit_expense_item") {
     setPendingEdit(ctx.from.id, draftId, "expense_item", itemIndex);
@@ -593,11 +495,7 @@ async function handleCallbackQuery(ctx) {
       existingCount
     );
     const replyMarkup = buildPreviewKeyboards(draftId, existingCount);
-    try {
-      await ctx.editMessageText(previewMsg, { parse_mode: "Markdown", reply_markup: replyMarkup });
-    } catch (e) {
-      await ctx.reply(previewMsg, { parse_mode: "Markdown", reply_markup: replyMarkup });
-    }
+    await safeEditOrReply(ctx, previewMsg, { parse_mode: "Markdown", reply_markup: replyMarkup });
 
   } else if (action === "cancel_report") {
     await ctx.answerCbQuery("Đã hủy bỏ báo cáo.");
