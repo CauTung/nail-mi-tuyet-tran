@@ -67,11 +67,15 @@ CREATE TABLE IF NOT EXISTS report_staff_revenue (
     is_unknown_staff BOOLEAN DEFAULT FALSE,
     attendance_description VARCHAR(255) DEFAULT 'Làm cả ngày',
     attendance_score NUMERIC(5, 2) DEFAULT 1.0,
+    late_minutes INT DEFAULT 0,
     goi_mong NUMERIC(15, 2) DEFAULT 0,
     mi NUMERIC(15, 2) DEFAULT 0,
     ngoai_gio NUMERIC(15, 2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Tự động bổ sung cột late_minutes nếu bảng report_staff_revenue đã tồn tại
+ALTER TABLE report_staff_revenue ADD COLUMN IF NOT EXISTS late_minutes INT DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_staff_revenue_date ON report_staff_revenue(report_date);
 CREATE INDEX IF NOT EXISTS idx_staff_revenue_report_id ON report_staff_revenue(report_id);

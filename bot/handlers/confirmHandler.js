@@ -235,7 +235,21 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
       const breakdownParts = getStaffRevenueBreakdown(s);
       const breakdownStr = breakdownParts.length > 0 ? ` *(${breakdownParts.join(", ")})*` : "";
       const unknownTag = s.is_unknown_staff ? " ⚠️ *(Tên mới)*" : "";
-      msg += `• **${staffName}**${unknownTag}: **${formatMoney(total)}**${breakdownStr}\n`;
+
+      let attendanceTag = "";
+      const score = s.attendance_score !== undefined ? s.attendance_score : 1.0;
+      const lateMins = Number(s.late_minutes) || 0;
+      const attDesc = s.attendance_description || "";
+
+      if (score !== 1.0 || lateMins > 0 || (attDesc && attDesc !== "Làm cả ngày")) {
+        const parts = [];
+        if (score !== 1.0) parts.push(`Công: ${score}`);
+        if (lateMins > 0) parts.push(`⏰ Muộn ${lateMins}p`);
+        if (attDesc && attDesc !== "Làm cả ngày" && !parts.some(p => attDesc.includes(p))) parts.push(attDesc);
+        if (parts.length > 0) attendanceTag = ` *[${parts.join(" | ")}]*`;
+      }
+
+      msg += `• **${staffName}**${attendanceTag}${unknownTag}: **${formatMoney(total)}**${breakdownStr}\n`;
     });
     msg += `\n`;
   }

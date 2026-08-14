@@ -169,6 +169,7 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
           is_unknown_staff: s.is_unknown_staff || false,
           attendance_description: s.attendance_description || "Làm cả ngày",
           attendance_score: s.attendance_score !== undefined ? s.attendance_score : 1.0,
+          late_minutes: Number(s.late_minutes) || 0,
           goi_mong: s.revenue?.goi_mong || 0,
           mi: s.revenue?.mi || 0,
           ngoai_gio: s.revenue?.ngoai_gio || 0

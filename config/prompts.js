@@ -46,6 +46,9 @@ Nhiệm vụ của bạn là phân tích hình ảnh (bảng viết tay, ảnh c
    - Ví dụ: "Nghỉ 1/4 ngày" (tức là làm 3/4 ngày) -> attendance_score: 0.75
    - Nếu không có ghi chú gì đặc biệt về thời gian nghỉ, mặc định là làm cả ngày -> attendance_score: 1.0
 
+3. Phân tích số phút đi muộn (LATE MINUTES):
+   - Nếu có ghi chú đi muộn (Ví dụ: "Đi muộn 15p", "Đến muộn 30 phút", "Tre 20p") -> trích xuất \`late_minutes\`: 15 (số nguyên đại diện cho phút đi muộn). Nếu không có ghi chú đi muộn, mặc định \`late_minutes\`: 0.
+
 ### QUY TẮC QUY ĐỔI TIỀN TỆ NGHÌN ĐỒNG (THOUSANDS / K):
 1. BẮT BUỘC: Tất cả các con số đứng đơn lẻ trong trang sổ tay (Ví dụ: 50, 100, 140, 250, 260, 400) ĐỀU MẶC ĐỊNH LÀ ĐƠN VỊ NGHÌN ĐỒNG (k) và phải nhân với 1.000 để ra số tiền thực tế (ví dụ: 50 ➔ 50,000đ, 100 ➔ 100,000đ, 140 ➔ 140,000đ, 260 ➔ 260,000đ, 400 ➔ 400,000đ).
 2. Nếu có phép tính cộng dạng "200 + 150", tính tổng số tiền = 200,000đ + 150,000đ = 350,000đ (nếu 150 bị gạch xóa thì chỉ tính 200,000đ và cho 150,000đ vào deleted_items).
@@ -108,6 +111,7 @@ CẤU TRÚC JSON MẪU 1 (DÀNH CHO BÁO CÁO THU CHI):
       "name": "Quỳnh Anh",
       "attendance_score": 1.0,
       "attendance_description": "Làm cả ngày",
+      "late_minutes": 0,
       "is_unknown_staff": false,
       "items": [150000, 200000, 400000],
       "revenue": ${JSON.stringify(sampleRevenueFields, null, 8).replace(/\n\s*}/, "\n      }")}

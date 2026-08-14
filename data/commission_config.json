@@ -14,11 +14,6 @@
       "key": "ngoai_gio",
       "label": "Ngoài Giờ / Tăng Ca",
       "percent": 50
-    },
-    {
-      "key": "goi_duong_sinh",
-      "label": "Gội dưỡng sinh",
-      "percent": 20
     }
   ]
 }
