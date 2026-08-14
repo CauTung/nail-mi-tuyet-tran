@@ -56,21 +56,7 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
     const existingReports = await getDailyReports(targetDate);
     if (existingReports && existingReports.length > 0) {
       const backupId = `BAK_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-      const backupRecord = {
-        id: backupId,
-        original_report_date: targetDate,
-        action_type: "overwrite",
-        user_info: metaInfo.userInfo || null,
-        snapshot_data: existingReports,
-        created_at: now.toISOString()
-      };
 
-      // Backup local JSON
-      const backupDir = path.join(DATA_DIR, "backups");
-      if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-      fs.writeFileSync(path.join(backupDir, `${backupId}.json`), JSON.stringify(backupRecord, null, 2), "utf-8");
-
-      // Backup Supabase
       if (isSupabaseConnected()) {
         try {
           await supabase.from("report_backups").insert({
@@ -89,16 +75,9 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
             .eq("report_date", targetDate)
             .eq("status", "active");
         } catch (e) {
-          console.error("Lỗi lưu backup báo cáo trên Supabase:", e);
+          console.error("❌ Lỗi lưu backup báo cáo trên Supabase:", e);
         }
       }
-    }
-
-    // Reset file JSON local thành mảng rỗng cho ngày đó
-    const monthFolder = path.join(REPORTS_DIR, yearMonth);
-    const dailyFile = path.join(monthFolder, `${targetDate}.json`);
-    if (fs.existsSync(dailyFile)) {
-      try { fs.writeFileSync(dailyFile, JSON.stringify([], null, 2), "utf-8"); } catch (e) {}
     }
   }
 
@@ -110,22 +89,6 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
     input_type: metaInfo.inputType || "text",
     parsed_result: reportData
   };
-
-  // Local JSON saving
-  const monthFolder = path.join(REPORTS_DIR, yearMonth);
-  if (!fs.existsSync(monthFolder)) fs.mkdirSync(monthFolder, { recursive: true });
-  const dailyFile = path.join(monthFolder, `${targetDate}.json`);
-
-  let dailyReports = [];
-  if (fs.existsSync(dailyFile)) {
-    try {
-      dailyReports = JSON.parse(fs.readFileSync(dailyFile, "utf-8"));
-    } catch (e) {
-      dailyReports = [];
-    }
-  }
-  dailyReports.unshift(record);
-  fs.writeFileSync(dailyFile, JSON.stringify(dailyReports, null, 2), "utf-8");
 
   // Save Installments if any
   if (Array.isArray(reportData.installments_data) && reportData.installments_data.length > 0) {
@@ -144,7 +107,8 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
         user_info: metaInfo.userInfo || null,
         input_type: metaInfo.inputType || "text",
         raw_data: reportData,
-        created_at: now.toISOString()
+        created_at: now.toISOString(),
+        status: "active"
       });
 
       if (insErr) {
@@ -152,7 +116,7 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
         console.error(`❌ [SUPABASE ERROR] Lỗi ghi báo cáo ngày ${targetDate}: ${insErr.message}`);
       } else {
         dbSaved = true;
-        console.log(`✅ [SUPABASE SUCCESS] Đã chốt lưu báo cáo thành công vào Database (ID: ${reportId}, Ngày: ${targetDate})`);
+        console.log(`✅ [SUPABASE SUCCESS] Đã lưu thành công báo cáo vào Supabase Database (ID: ${reportId}, Ngày: ${targetDate})`);
       }
 
       // Ghi log lịch sử ocr_logs
@@ -198,46 +162,25 @@ async function saveReport(reportData, metaInfo = {}, explicitDate = null) {
       console.error("❌ [SUPABASE EXCEPTION] Lỗi ngoại lệ khi ghi báo cáo vào Supabase:", err.message);
     }
   } else {
-    console.warn("⚠️ [STORAGE WARN] Supabase chưa kết nối. Báo cáo chỉ được lưu dưới dạng file JSON local.");
+    console.warn("⚠️ [STORAGE WARN] Chưa kết nối Supabase CSDL.");
   }
 
-  return { record, filePath: dailyFile, dateStr: targetDate, dbSaved, dbError };
+  return { record, dateStr: targetDate, dbSaved, dbError };
 }
 
 async function deleteReport(reportId) {
   if (isSupabaseConnected()) {
     try {
-      await supabase.from("reports").delete().eq("id", reportId);
+      const { error } = await supabase.from("reports").delete().eq("id", reportId);
+      await supabase.from("report_staff_revenue").delete().eq("report_id", reportId).catch(() => {});
+      await supabase.from("report_expenses").delete().eq("report_id", reportId).catch(() => {});
+      return !error;
     } catch (err) {
       console.error("Lỗi xóa báo cáo trên Supabase:", err);
+      return false;
     }
   }
-
-  ensureLocalDirs();
-  const months = fs.readdirSync(REPORTS_DIR);
-  let deleted = false;
-
-  for (const ym of months) {
-    const monthPath = path.join(REPORTS_DIR, ym);
-    if (fs.statSync(monthPath).isDirectory()) {
-      const files = fs.readdirSync(monthPath).filter(f => f.endsWith(".json"));
-      for (const file of files) {
-        const filePath = path.join(monthPath, file);
-        try {
-          let list = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-          const originalLen = list.length;
-          list = list.filter(r => r.id !== reportId);
-          if (list.length < originalLen) {
-            fs.writeFileSync(filePath, JSON.stringify(list, null, 2), "utf-8");
-            deleted = true;
-            break;
-          }
-        } catch (e) {}
-      }
-    }
-    if (deleted) break;
-  }
-  return deleted;
+  return false;
 }
 
 async function updateStaffRevenue(reportId, staffName, goiMong, mi, ngoaiGio) {
@@ -288,52 +231,13 @@ async function updateStaffRevenue(reportId, staffName, goiMong, mi, ngoaiGio) {
           staffObj.ngoai_gio = Number(ngoaiGio);
         }
         await supabase.from("reports").update({ raw_data: rawData }).eq("id", reportId);
+        return { id: reportId, parsed_result: rawData };
       }
     } catch (err) {
       console.error("Lỗi cập nhật doanh số nhân viên Supabase:", err);
     }
   }
-
-  // Local JSON fallback update
-  ensureLocalDirs();
-  const months = fs.readdirSync(REPORTS_DIR);
-  let updatedRecord = null;
-
-  for (const ym of months) {
-    const monthPath = path.join(REPORTS_DIR, ym);
-    if (fs.statSync(monthPath).isDirectory()) {
-      const files = fs.readdirSync(monthPath).filter(f => f.endsWith(".json"));
-      for (const file of files) {
-        const filePath = path.join(monthPath, file);
-        try {
-          let list = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-          const target = list.find(r => r.id === reportId);
-          if (target) {
-            let staffObj = target.parsed_result.staff_data.find(s => s.name.toLowerCase() === staffName.toLowerCase());
-            if (!staffObj) {
-              staffObj = {
-                name: staffName,
-                is_unknown_staff: false,
-                attendance_description: "Làm cả ngày",
-                attendance_score: 1.0,
-                revenue: { goi_mong: 0, mi: 0, ngoai_gio: 0 }
-              };
-              target.parsed_result.staff_data.push(staffObj);
-            }
-            if (goiMong !== undefined && goiMong !== null) staffObj.revenue.goi_mong = Number(goiMong);
-            if (mi !== undefined && mi !== null) staffObj.revenue.mi = Number(mi);
-            if (ngoaiGio !== undefined && ngoaiGio !== null) staffObj.revenue.ngoai_gio = Number(ngoaiGio);
-
-            fs.writeFileSync(filePath, JSON.stringify(list, null, 2), "utf-8");
-            updatedRecord = target;
-            break;
-          }
-        } catch (e) {}
-      }
-    }
-    if (updatedRecord) break;
-  }
-  return updatedRecord;
+  return null;
 }
 
 async function updateExpense(reportId, amount, notes) {
@@ -363,43 +267,13 @@ async function updateExpense(reportId, amount, notes) {
           }
         ];
         await supabase.from("reports").update({ raw_data: rawData }).eq("id", reportId);
+        return { id: reportId, parsed_result: rawData };
       }
     } catch (err) {
       console.error("Lỗi cập nhật chi tiêu Supabase:", err);
     }
   }
-
-  ensureLocalDirs();
-  const months = fs.readdirSync(REPORTS_DIR);
-  let updatedRecord = null;
-
-  for (const ym of months) {
-    const monthPath = path.join(REPORTS_DIR, ym);
-    if (fs.statSync(monthPath).isDirectory()) {
-      const files = fs.readdirSync(monthPath).filter(f => f.endsWith(".json"));
-      for (const file of files) {
-        const filePath = path.join(monthPath, file);
-        try {
-          let list = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-          const target = list.find(r => r.id === reportId);
-          if (target) {
-            target.parsed_result.expenses_data = [
-              {
-                category: "Chi phí điều chỉnh",
-                amount: Number(amount),
-                notes: notes || "Đã điều chỉnh chi tiêu"
-              }
-            ];
-            fs.writeFileSync(filePath, JSON.stringify(list, null, 2), "utf-8");
-            updatedRecord = target;
-            break;
-          }
-        } catch (e) {}
-      }
-    }
-    if (updatedRecord) break;
-  }
-  return updatedRecord;
+  return null;
 }
 
 async function getDailyReports(dateStr) {
@@ -413,36 +287,23 @@ async function getDailyReports(dateStr) {
 
       if (error) {
         console.error(`⚠️ [SUPABASE ERROR] Lỗi truy vấn báo cáo ngày ${dateStr}:`, error.message);
+        return [];
       } else if (Array.isArray(data)) {
         const activeReports = data.filter(row => !row.status || row.status !== "overwritten");
         console.log(`📊 [SUPABASE] Tìm thấy ${activeReports.length}/${data.length} báo cáo hợp lệ cho ngày ${dateStr}`);
-        if (activeReports.length > 0) {
-          return activeReports.map(row => ({
-            id: row.id,
-            date: row.report_date,
-            user_info: row.user_info,
-            input_type: row.input_type,
-            parsed_result: row.raw_data
-          }));
-        }
+        return activeReports.map(row => ({
+          id: row.id,
+          date: row.report_date,
+          user_info: row.user_info,
+          input_type: row.input_type,
+          parsed_result: row.raw_data
+        }));
       }
     } catch (err) {
       console.error("❌ Lỗi kết nối Supabase khi lấy báo cáo ngày:", err.message);
     }
   }
-
-  ensureLocalDirs();
-  const [year, month] = dateStr.split("-");
-  const yearMonth = `${year}-${month}`;
-  const dailyFile = path.join(REPORTS_DIR, yearMonth, `${dateStr}.json`);
-
-  if (!fs.existsSync(dailyFile)) return [];
-
-  try {
-    return JSON.parse(fs.readFileSync(dailyFile, "utf-8"));
-  } catch (err) {
-    return [];
-  }
+  return [];
 }
 
 async function getMonthlyReportsList(yearMonth) {
@@ -462,40 +323,23 @@ async function getMonthlyReportsList(yearMonth) {
 
       if (error) {
         console.error(`⚠️ [SUPABASE ERROR] Lỗi truy vấn báo cáo tháng ${yearMonth}:`, error.message);
+        return [];
       } else if (Array.isArray(data)) {
         const activeReports = data.filter(row => !row.status || row.status !== "overwritten");
         console.log(`📊 [SUPABASE] Tìm thấy ${activeReports.length}/${data.length} báo cáo hợp lệ cho tháng ${yearMonth}`);
-        if (activeReports.length > 0) {
-          return activeReports.map(row => ({
-            id: row.id,
-            date: row.report_date,
-            user_info: row.user_info,
-            input_type: row.input_type,
-            parsed_result: row.raw_data
-          }));
-        }
+        return activeReports.map(row => ({
+          id: row.id,
+          date: row.report_date,
+          user_info: row.user_info,
+          input_type: row.input_type,
+          parsed_result: row.raw_data
+        }));
       }
     } catch (err) {
       console.error("❌ Lỗi kết nối Supabase khi lấy báo cáo tháng:", err.message);
     }
   }
-
-  ensureLocalDirs();
-  const monthFolder = path.join(REPORTS_DIR, yearMonth);
-  if (!fs.existsSync(monthFolder)) return [];
-
-  const files = fs.readdirSync(monthFolder).filter(f => f.endsWith(".json")).sort();
-  const allReports = [];
-
-  files.forEach(file => {
-    const filePath = path.join(monthFolder, file);
-    try {
-      const reports = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-      allReports.push(...reports);
-    } catch (e) {}
-  });
-
-  return allReports;
+  return [];
 }
 
 function savePhotoLog(imageBuffer, parsedResult, errorMsg = null) {
