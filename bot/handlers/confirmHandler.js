@@ -484,7 +484,8 @@ async function handleCallbackQuery(ctx) {
       deleteDraft(draftId);
       clearPendingEdit(ctx.from.id);
 
-      const successMsg = `✅ **ĐÃ LƯU THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n🆔 Mã báo cáo: \`${saved.record.id}\`\n💰 Tổng doanh thu: ${new Intl.NumberFormat("vi-VN").format(saved.record.parsed_result?.grand_total || 0)}đ`;
+      const calcTotal = (draft.result?.staff_data || []).reduce((acc, s) => acc + getStaffTotalRevenue(s), 0);
+      const successMsg = `✅ **ĐÃ LƯU THÀNH CÔNG BÁO CÁO NGÀY ${saved.dateStr}!**\n🆔 Mã báo cáo: \`${saved.record.id}\`\n💰 Tổng doanh thu: **${new Intl.NumberFormat("vi-VN").format(calcTotal)}đ**`;
       try {
         await ctx.editMessageText(successMsg, { parse_mode: "Markdown" });
       } catch (e) {
