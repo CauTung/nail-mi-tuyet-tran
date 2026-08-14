@@ -81,9 +81,9 @@ async function handleCategories(ctx) {
   });
 
   msg += `\n💡 **Lệnh Admin quản lý:**\n`;
-  msg += `• `/addcategory <key> "<Tên hiển thị>" <%_hoa_hồng>`\n`;
-  msg += `• `/setcommission <key> <%_mới>`\n`;
-  msg += `• `/delcategory <key>`\n`;
+  msg += `• \`/addcategory <key> "<Tên hiển thị>" <%_hoa_hồng>\`\n`;
+  msg += `• \`/setcommission <key> <%_mới>\`\n`;
+  msg += `• \`/delcategory <key>\`\n`;
 
   return ctx.reply(msg, { parse_mode: "Markdown" });
 }
