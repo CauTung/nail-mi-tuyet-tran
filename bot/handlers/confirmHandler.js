@@ -1,5 +1,7 @@
 const fs = require("fs");
 const path = require("path");
+const reportRepo = require("../../db/repositories/reportRepository");
+const staffRepo = require("../../db/repositories/staffRepository");
 
 const DRAFTS_FILE_PATH = path.join(__dirname, "../../data/pending_drafts.json");
 
