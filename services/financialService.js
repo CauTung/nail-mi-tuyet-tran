@@ -186,12 +186,18 @@ async function getMonthlySummary(yearMonth) {
           }
         });
 
+        const directLate = Number(s.late_minutes) || 0;
+        if (directLate > 0) {
+          staffStats[s.name].late_minutes += directLate;
+          staffStats[s.name].days_late += 1;
+        }
+
         if (s.attendance_description) {
           const desc = s.attendance_description.trim();
           if (desc && desc !== "Làm cả ngày") {
-            if (desc.toLowerCase().includes("muộn")) {
+            if (desc.toLowerCase().includes("muộn") && directLate === 0) {
               staffStats[s.name].days_late += 1;
-              const match = desc.match(/(\d+)\s*phút/i) || desc.match(/muộn\s*(\d+)/i);
+              const match = desc.match(/(\d+)\s*phút/i) || desc.match(/muộn\s*(\d+)/i) || desc.match(/(\d+)\s*p/i);
               if (match) {
                 staffStats[s.name].late_minutes += parseInt(match[1], 10);
               }
