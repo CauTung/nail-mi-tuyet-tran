@@ -109,6 +109,7 @@ CẤU TRÚC JSON MẪU 1 (DÀNH CHO BÁO CÁO THU CHI):
       "attendance_score": 1.0,
       "attendance_description": "Làm cả ngày",
       "is_unknown_staff": false,
+      "items": [150000, 200000, 400000],
       "revenue": ${JSON.stringify(sampleRevenueFields, null, 8).replace(/\n\s*}/, "\n      }")}
     }
   ],

@@ -222,18 +222,13 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
         warnings.push(`💰 Doanh số thợ **"${staffName}"** trong ngày lớn (**${formatMoney(total)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_DAILY_TOTAL)}).`);
       }
 
-      if (s.revenue && typeof s.revenue === "object") {
-        Object.entries(s.revenue).forEach(([catKey, val]) => {
-          const num = Number(val) || 0;
-          if (num >= WARNING_THRESHOLDS.STAFF_SINGLE_ITEM) {
-            warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **${catKey}** lớn bất thường (**${formatMoney(num)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ITEM)}).`);
-          }
-        });
-      } else {
-        if (s.goi_mong >= WARNING_THRESHOLDS.STAFF_SINGLE_ITEM) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Gội/Móng** lớn bất thường (**${formatMoney(s.goi_mong)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ITEM)}).`);
-        if (s.mi >= WARNING_THRESHOLDS.STAFF_SINGLE_ITEM) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Mi/Xăm** lớn bất thường (**${formatMoney(s.mi)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ITEM)}).`);
-        if (s.ngoai_gio >= WARNING_THRESHOLDS.STAFF_SINGLE_ITEM) warnings.push(`⚠️ Thợ **"${staffName}"** có khoản **Ngoài giờ** lớn bất thường (**${formatMoney(s.ngoai_gio)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ITEM)}).`);
-      }
+      const itemsArray = Array.isArray(s.items) ? s.items : (Array.isArray(s.single_items) ? s.single_items : []);
+      itemsArray.forEach(itemVal => {
+        const num = Number(typeof itemVal === "object" ? itemVal.amount : itemVal) || 0;
+        if (num >= WARNING_THRESHOLDS.STAFF_SINGLE_ENTRY) {
+          warnings.push(`⚠️ Thợ **"${staffName}"** có 1 lượt làm / 1 dòng đơn lẻ lớn bất thường (**${formatMoney(num)}** ≥ ${formatMoney(WARNING_THRESHOLDS.STAFF_SINGLE_ENTRY)}).`);
+        }
+      });
 
       const breakdownParts = getStaffRevenueBreakdown(s);
       const breakdownStr = breakdownParts.length > 0 ? ` *(${breakdownParts.join(", ")})*` : "";
