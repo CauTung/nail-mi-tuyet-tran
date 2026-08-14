@@ -5,13 +5,17 @@ let supabase = null;
 
 if (env.supabaseUrl && env.supabaseKey) {
   supabase = createClient(env.supabaseUrl, env.supabaseKey);
-  console.log(`⚡ [SUPABASE] Đã khởi tạo Supabase Client (Target: ${env.supabaseUrl})`);
+  const keyLen = env.supabaseKey.length;
+  console.log(`⚡ [SUPABASE] Đã khởi tạo Supabase Client (Target: ${env.supabaseUrl}, Key length: ${keyLen} chars)`);
+
   // Thực hiện test ping thực tế qua HTTP
   supabase.from("staff").select("id", { count: "exact", head: true })
     .then(({ error }) => {
       if (error) {
         console.warn(`⚠️ [SUPABASE PING FAILED] Không thể truy vấn tới '${env.supabaseUrl}'. Chi tiết: ${error.message}`);
-        console.warn(`💡 Vui lòng kiểm tra lại SUPABASE_URL trong biến môi trường Render (phải có https:// và đúng tên domain .supabase.co).`);
+        if (error.message.includes("fetch failed")) {
+          console.warn(`💡 [GỢI Ý] Lỗi 'fetch failed' xảy ra khi API Key chưa đúng hoặc kết nối HTTPS từ Render bị chặn. Hãy kiểm tra SUPABASE_KEY (anon key).`);
+        }
       } else {
         console.log("✅ [SUPABASE PING SUCCESS] Kết nối mạng và truy vấn CSDL Supabase hoàn toàn bình thường!");
       }
