@@ -2,6 +2,9 @@ const fs = require("fs");
 const path = require("path");
 const reportRepo = require("../../db/repositories/reportRepository");
 const staffRepo = require("../../db/repositories/staffRepository");
+const { getStaffTotalRevenue, getStaffRevenueBreakdown } = require("../../services/revenueService");
+const { formatMoney } = require("../../utils/formatter");
+const { safeEditOrReply, safeAnswerCbQuery } = require("../utils/botHelpers");
 
 const DRAFTS_FILE_PATH = path.join(__dirname, "../../data/pending_drafts.json");
 
@@ -181,13 +184,6 @@ function clearPendingEdit(userId) {
   pendingEdits.delete(userId);
 }
 
-function getStaffTotalRevenue(s) {
-  if (s && s.revenue && typeof s.revenue === "object") {
-    return Object.values(s.revenue).reduce((sum, val) => sum + (Number(val) || 0), 0);
-  }
-  return (Number(s?.goi_mong) || 0) + (Number(s?.mi) || 0) + (Number(s?.ngoai_gio) || 0);
-}
-
 function formatPreviewResponse(reportData, targetDateStr, confidence, dateReasoning, existingCount = 0) {
   let msg = `📋 **XEM TRƯỚC BÁO CÁO THU CHI**\n`;
   msg += `------------------------------------\n`;
@@ -222,26 +218,13 @@ function formatPreviewResponse(reportData, targetDateStr, confidence, dateReason
         warnings.push(`⚠️ Tên thợ **"${staffName}"** chưa có trong hệ thống (sẽ tự động thêm khi chốt lưu).`);
       }
       if (total > 5000000) {
-        warnings.push(`💰 Doanh số thợ **"${staffName}"** cao bất thường (${new Intl.NumberFormat("vi-VN").format(total)}đ > 5 triệu).`);
+        warnings.push(`💰 Doanh số thợ **"${staffName}"** cao bất thường (${formatMoney(total)} > 5 triệu).`);
       }
 
-      let breakdownParts = [];
-      if (s.revenue && typeof s.revenue === "object") {
-        Object.entries(s.revenue).forEach(([k, val]) => {
-          const num = Number(val) || 0;
-          if (num > 0) {
-            breakdownParts.push(`${k} ${new Intl.NumberFormat("vi-VN").format(num)}đ`);
-          }
-        });
-      } else {
-        if (s.goi_mong > 0) breakdownParts.push(`Gội/Móng ${new Intl.NumberFormat("vi-VN").format(s.goi_mong)}đ`);
-        if (s.mi > 0) breakdownParts.push(`Mi/Xăm ${new Intl.NumberFormat("vi-VN").format(s.mi)}đ`);
-        if (s.ngoai_gio > 0) breakdownParts.push(`Ngoài giờ ${new Intl.NumberFormat("vi-VN").format(s.ngoai_gio)}đ`);
-      }
-
+      const breakdownParts = getStaffRevenueBreakdown(s);
       const breakdownStr = breakdownParts.length > 0 ? ` *(${breakdownParts.join(", ")})*` : "";
       const unknownTag = s.is_unknown_staff ? " ⚠️ *(Tên mới)*" : "";
-      msg += `• **${staffName}**${unknownTag}: **${new Intl.NumberFormat("vi-VN").format(total)}đ**${breakdownStr}\n`;
+      msg += `• **${staffName}**${unknownTag}: **${formatMoney(total)}**${breakdownStr}\n`;
     });
     msg += `\n`;
   }

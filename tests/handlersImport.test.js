@@ -16,6 +16,8 @@ test("Verify all Handler files import successfully without undefined dependencie
 
 test("Verify createBotApp initializes cleanly", () => {
   process.env.TELEGRAM_BOT_TOKEN = "123456789:TestDummyTokenForUnitTestingOnly";
+  delete require.cache[require.resolve("../config/env")];
+  delete require.cache[require.resolve("../bot/botApp")];
   const { createBotApp } = require("../bot/botApp");
   const bot = createBotApp();
   assert.ok(bot, "Bot instance should be created");

@@ -7,10 +7,7 @@ const aiService = require("../../services/aiService");
 const staffRepo = require("../../db/repositories/staffRepository");
 
 const chartService = require("../../services/chartService");
-
-function formatMoney(amount) {
-  return new Intl.NumberFormat("vi-VN").format(amount || 0) + "đ";
-}
+const { formatMoney } = require("../../utils/formatter");
 
 async function handleToday(ctx) {
   const { dateStr } = reportRepo.getDateKeys();

@@ -3,10 +3,8 @@ const aiService = require("../../services/aiService");
 const reportRepo = require("../../db/repositories/reportRepository");
 const staffRepo = require("../../db/repositories/staffRepository");
 const confirmHandler = require("./confirmHandler");
-
-function formatMoney(amount) {
-  return new Intl.NumberFormat("vi-VN").format(amount || 0) + "đ";
-}
+const { formatMoney } = require("../../utils/formatter");
+const { getStaffTotalRevenue } = require("../../services/revenueService");
 
 function formatReportResponse(reportData, reportId, targetDateStr) {
   let msg = `✅ **BÁO CÁO NGÀY ${targetDateStr} ĐÃ ĐƯỢC GHI NHẬN!**\n`;
